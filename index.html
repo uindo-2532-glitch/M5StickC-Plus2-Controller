@@ -175,7 +175,7 @@
 
             // 30分（1800秒）ごとの加算判定
             // ※テスト時に短い時間で試したい場合は 1800 を 10（10秒）などに変更してください
-            const INTERVAL = 1800; // 30分 = 1800秒
+            const INTERVAL = 10; // 30分 = 1800秒
             const currentIntervalCount = Math.floor(elapsedSec / INTERVAL);
 
             if (currentIntervalCount > lastPointIntervalCount) {
