@@ -12,6 +12,17 @@
         .btn-on { background: #28a745; color: white; }
         .btn-off { background: #dc3545; color: white; }
         #status { font-weight: bold; margin-top: 20px; color: #555; }
+        
+        .point-box {
+            background: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 300px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .point-val { font-size: 40px; color: #e67e22; font-weight: bold; }
+        .timer-val { font-size: 20px; color: #333; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -24,8 +35,15 @@
     <button class="btn-off" id="ledOffBtn" disabled>LED 消灯</button>
 
     <div id="status">ステータス: 未接続</div>
-    <div id="btnStatus" style="font-size: 24px; margin-top: 30px;">---</div>
-    <div id="btnImg" style="font-size: 24px; margin-top: 30px;">---</div>
+
+    <div class="point-box">
+        <div>現在のポイント</div>
+        <div class="point-val" id="pointDisplay">0 PT</div>
+        <div class="timer-val" id="timerDisplay">経過時間: 00:00</div>
+    </div>
+
+    <div id="btnStatus" style="font-size: 20px; margin-top: 20px;">---</div>
+    <div id="btnImg" style="font-size: 24px; margin-top: 10px;"></div>
 
     <script>
         const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
@@ -34,13 +52,26 @@
         let bluetoothDevice = null;
         let dataCharacteristic = null;
 
-        const connectBtn 	= document.getElementById('connectBtn');
-        const ledOnBtn 		= document.getElementById('ledOnBtn');
-        const ledOffBtn 	= document.getElementById('ledOffBtn');
-        const statusDiv 	= document.getElementById('status');
-        const btnStatusDiv 	= document.getElementById('btnStatus');
-	const btnStatusImg 	= document.getElementById('btnImg');
+        // システム状態変数
+        let points = 0;
+        let isSessionActive = false; // Aボタン（開始）〜Bボタン（終了）のセッション中か
+        let sessionStartTime = null;
+        let timerInterval = null;
+        let lastPointIntervalCount = 0; // 何回30分ポイントを受け取ったか
 
+        const connectBtn     = document.getElementById('connectBtn');
+        const ledOnBtn       = document.getElementById('ledOnBtn');
+        const ledOffBtn      = document.getElementById('ledOffBtn');
+        const statusDiv      = document.getElementById('status');
+        const btnStatusDiv   = document.getElementById('btnStatus');
+        const btnStatusImg   = document.getElementById('btnImg');
+        const pointDisplay   = document.getElementById('pointDisplay');
+        const timerDisplay   = document.getElementById('timerDisplay');
+
+        // UI更新関数
+        function updateUI() {
+            pointDisplay.innerText = `${points} PT`;
+        }
 
         // BLE接続処理
         connectBtn.addEventListener('click', async () => {
@@ -50,6 +81,9 @@
                     filters: [{ name: 'M5StickC_Plus2_BLE' }],
                     optionalServices: [SERVICE_UUID]
                 });
+
+                // 切断イベント検知（スマホアプリ最小化などでBLEが切れた時）
+                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
 
                 statusDiv.innerText = "接続中...";
                 const server = await bluetoothDevice.gatt.connect();
@@ -69,6 +103,19 @@
             }
         });
 
+        // 意図しない切断（バックグラウンド移行など）の処理
+        function onDisconnected() {
+            statusDiv.innerText = "切断されました！";
+            ledOnBtn.disabled = true;
+            ledOffBtn.disabled = true;
+
+            // セッション実行中に切断された場合のペナルティ処理
+            if (isSessionActive) {
+                applyPenalty("切断（最小化など）によりペナルティ適用");
+                stopSession();
+            }
+        }
+
         // スマホからM5へのデータ送信 (Write)
         async function sendData(value) {
             if (!dataCharacteristic) return;
@@ -82,18 +129,86 @@
         // M5からのデータ受信ハンドラ (Notify)
         function handleNotifications(event) {
             const value = event.target.value.getUint8(0);
-            if (value === 1) {
-                btnStatusDiv.innerText = "M5のボタンAが押されました！";
+
+            if (value === 1) { // ボタンA（開始）
+                btnStatusDiv.innerText = "M5のボタンA（開始）が押されました！";
                 btnStatusDiv.style.color = "#007bff";
-                setTimeout(() => { btnStatusDiv.innerText = "---"; }, 2000);
-		
-		btnStatusImg.innerHTML = '<img src="1.jpg">';
-            }else{
-                btnStatusDiv.innerText = "M5のボタンBが押されました！";
+                btnStatusImg.innerHTML = '<img src="1.jpg" width="100">';
+
+                startSession();
+
+            } else if (value === 0) { // ボタンB（終了）
+                btnStatusDiv.innerText = "M5のボタンB（終了）が押されました！";
                 btnStatusDiv.style.color = "#ff7bff";
-                setTimeout(() => { btnStatusDiv.innerText = "---"; }, 2000);
-		btnStatusImg.innerHTML = '<img src="2.jpg">';
-	    }
+                btnStatusImg.innerHTML = '<img src="2.jpg" width="100">';
+
+                stopSession();
+            }
+        }
+
+        // --- セッション・ポイント計算ロジック ---
+
+        // 計測開始
+        function startSession() {
+            if (isSessionActive) return; // 既に開始されている場合は無視
+
+            isSessionActive = true;
+            sessionStartTime = Date.now();
+            lastPointIntervalCount = 0;
+            
+            statusDiv.innerText = "計測中...";
+
+            // 1秒周期でタイマー・ポイントチェック更新
+            timerInterval = setInterval(checkSessionProgress, 1000);
+        }
+
+        // 計測進行チェック（1秒ごとに実行）
+        function checkSessionProgress() {
+            if (!isSessionActive) return;
+
+            const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
+            
+            // 経過時間表示の更新 (MM:SS)
+            const minutes = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+            const seconds = String(elapsedSec % 60).padStart(2, '0');
+            timerDisplay.innerText = `経過時間: ${minutes}:${seconds}`;
+
+            // 30分（1800秒）ごとの加算判定
+            // ※テスト時に短い時間で試したい場合は 1800 を 10（10秒）などに変更してください
+            const INTERVAL = 1800; // 30分 = 1800秒
+            const currentIntervalCount = Math.floor(elapsedSec / INTERVAL);
+
+            if (currentIntervalCount > lastPointIntervalCount) {
+                // 30分経過するごとに +10 ポイント
+                const addedPoints = (currentIntervalCount - lastPointIntervalCount) * 10;
+                points += addedPoints;
+                lastPointIntervalCount = currentIntervalCount;
+                
+                updateUI();
+                btnStatusDiv.innerText = `30分経過！ +${addedPoints}ポイント獲得！`;
+            }
+        }
+
+        // 計測正常終了 (ボタンB)
+        function stopSession() {
+            if (!isSessionActive) return;
+
+            isSessionActive = false;
+            clearInterval(timerInterval);
+            statusDiv.innerText = "計測終了";
+            timerDisplay.innerText = "経過時間: 00:00";
+            updateUI();
+        }
+
+        // ペナルティ適用ロジック
+        function applyPenalty(reason) {
+            if (points === 0) {
+                btnStatusDiv.innerText = `${reason}: ポイントなしのため加算なし`;
+            } else {
+                points = Math.floor(points / 2); // ポイント半減（端数切り捨て）
+                btnStatusDiv.innerText = `${reason}: ポイントが半減しました！`;
+            }
+            updateUI();
         }
 
         // Service Workerの登録 (PWA用)
@@ -103,4 +218,3 @@
     </script>
 </body>
 </html>
-
