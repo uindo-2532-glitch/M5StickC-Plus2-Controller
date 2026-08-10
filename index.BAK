@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M5StickC BLE PWA</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f0f0f0; }
+        button { padding: 15px 25px; font-size: 16px; margin: 10px; border-radius: 5px; border: none; cursor: pointer; }
+        .btn-connect { background: #007bff; color: white; }
+        .btn-on { background: #28a745; color: white; }
+        .btn-off { background: #dc3545; color: white; }
+        #status { font-weight: bold; margin-top: 20px; color: #555; }
+    </style>
+</head>
+<body>
+
+    <h1>M5StickC Plus2 Controller</h1>
+    
+    <button class="btn-connect" id="connectBtn">M5Stackに接続</button>
+    <br><br>
+    <button class="btn-on" id="ledOnBtn" disabled>LED 点灯</button>
+    <button class="btn-off" id="ledOffBtn" disabled>LED 消灯</button>
+
+    <div id="status">ステータス: 未接続</div>
+    <div id="btnStatus" style="font-size: 24px; margin-top: 30px;">---</div>
+    <div id="btnImg" style="font-size: 24px; margin-top: 30px;">---</div>
+
+    <script>
+        const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
+        const CHARACTERISTIC_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
+
+        let bluetoothDevice = null;
+        let dataCharacteristic = null;
+
+        const connectBtn 	= document.getElementById('connectBtn');
+        const ledOnBtn 		= document.getElementById('ledOnBtn');
+        const ledOffBtn 	= document.getElementById('ledOffBtn');
+        const statusDiv 	= document.getElementById('status');
+        const btnStatusDiv 	= document.getElementById('btnStatus');
+	const btnStatusImg 	= document.getElementById('btnImg');
+
+
+        // BLE接続処理
+        connectBtn.addEventListener('click', async () => {
+            try {
+                statusDiv.innerText = "デバイスを探しています...";
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'M5StickC_Plus2_BLE' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                statusDiv.innerText = "接続中...";
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                dataCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+                // Notifyの受信設定
+                await dataCharacteristic.startNotifications();
+                dataCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
+
+                statusDiv.innerText = "接続完了！";
+                ledOnBtn.disabled = false;
+                ledOffBtn.disabled = false;
+            } catch (error) {
+                console.error(error);
+                statusDiv.innerText = "エラー: " + error;
+            }
+        });
+
+        // スマホからM5へのデータ送信 (Write)
+        async function sendData(value) {
+            if (!dataCharacteristic) return;
+            const encoder = new TextEncoder();
+            await dataCharacteristic.writeValue(encoder.encode(value));
+        }
+
+        ledOnBtn.addEventListener('click', () => sendData('1'));
+        ledOffBtn.addEventListener('click', () => sendData('0'));
+
+        // M5からのデータ受信ハンドラ (Notify)
+        function handleNotifications(event) {
+            const value = event.target.value.getUint8(0);
+            if (value === 1) {
+                btnStatusDiv.innerText = "M5のボタンAが押されました！";
+                btnStatusDiv.style.color = "#007bff";
+                setTimeout(() => { btnStatusDiv.innerText = "---"; }, 2000);
+		
+		btnStatusImg.innerHTML = '<img src="1.jpg">';
+            }else{
+                btnStatusDiv.innerText = "M5のボタンBが押されました！";
+                btnStatusDiv.style.color = "#ff7bff";
+                setTimeout(() => { btnStatusDiv.innerText = "---"; }, 2000);
+		btnStatusImg.innerHTML = '<img src="2.jpg">';
+	    }
+        }
+
+        // Service Workerの登録 (PWA用)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
+
