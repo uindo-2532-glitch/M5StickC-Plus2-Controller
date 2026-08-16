@@ -37,12 +37,38 @@
             background: #222; padding: 15px; border-radius: 10px; margin: 10px 0; color: #fff;
             transition: background 0.3s;
         }
-        .slot-reel {
-            width: 70px; height: 70px; line-height: 70px; background: #333;
-            border-radius: 8px; border: 2px solid #555;
-            position: relative;
-            overflow: hidden;
-        }
+        /* スロット枠（固定） */
+.slot-reel {
+    width: 70px;
+    height: 70px;
+    line-height: 70px;
+    background: #333;
+    border-radius: 8px;
+    border: 2px solid #555;
+    position: relative;
+    overflow: hidden; /* 枠からはみ出た絵柄を隠す */
+}
+
+/* 枠の中で動く絵柄用インナー要素 */
+.reel-inner {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* スピン中のアニメーション（絵柄だけを動かす） */
+@keyframes spinSymbol {
+    0% { transform: translateY(-100%); opacity: 0.3; }
+    50% { opacity: 0.8; }
+    100% { transform: translateY(100%); opacity: 0.3; }
+}
+
+/* spinning クラスは中の .reel-inner に付与する */
+.spinning {
+    animation: spinSymbol 0.08s linear infinite;
+}
 
         /* スピン中のアニメーション */
         @keyframes spinReel {
@@ -99,11 +125,11 @@
         <div>所持チケット: <b id="ticketDisplay" style="color:#e67e22; font-size:18px;">0</b> 枚</div>
         <div>所持コイン: <b id="coinDisplay" style="color:#f1c40f; font-size:18px;">0</b> C</div>
 
-        <div class="slot-container" id="slotContainer">
-            <div class="slot-reel" id="reel1">❓</div>
-            <div class="slot-reel" id="reel2">❓</div>
-            <div class="slot-reel" id="reel3">❓</div>
-        </div>
+       <div class="slot-container" id="slotContainer">
+    <div class="slot-reel"><span class="reel-inner" id="reel1">❓</span></div>
+    <div class="slot-reel"><span class="reel-inner" id="reel2">❓</span></div>
+    <div class="slot-reel"><span class="reel-inner" id="reel3">❓</span></div>
+</div>
 
         <button class="btn-spin" id="spinBtn" disabled>スピン (1枚消費)</button>
         <div id="slotMsg" style="margin-top: 8px; font-weight: bold; min-height: 20px;"></div>
@@ -375,50 +401,50 @@
             saveGame();
         }
 
-        // --- アニメーション付きスロット処理 ---
-        spinBtn.addEventListener('click', () => {
-            if (tickets <= 0 || isSpinning) return;
+       // --- アニメーション付きスロット処理 ---
+spinBtn.addEventListener('click', () => {
+    if (tickets <= 0 || isSpinning) return;
 
-            isSpinning = true;
-            updateUI();
+    isSpinning = true;
+    updateUI();
 
-            const isRefund = Math.random() < (upgrades.refund.lv * 0.1);
-            if (!isRefund) {
-                tickets--;
-            }
+    const isRefund = Math.random() < (upgrades.refund.lv * 0.1);
+    if (!isRefund) {
+        tickets--;
+    }
 
-            spinsLeft--;
+    spinsLeft--;
 
-            // アニメーション開始
-            reel1Div.classList.add('spinning');
-            reel2Div.classList.add('spinning');
-            reel3Div.classList.add('spinning');
-            slotMsg.innerText = "スピン中...";
+    // 枠の中の文字（.reel-inner）にアニメーションを付与
+    reel1Div.classList.add('spinning');
+    reel2Div.classList.add('spinning');
+    reel3Div.classList.add('spinning');
+    slotMsg.innerText = "スピン中...";
 
-            // 結果を先に生成
-            const r1 = getRandomSymbol();
-            const r2 = getRandomSymbol();
-            const r3 = getRandomSymbol();
+    // 結果を先に生成
+    const r1 = getRandomSymbol();
+    const r2 = getRandomSymbol();
+    const r3 = getRandomSymbol();
 
-            // リールを順番に停止させる
-            setTimeout(() => {
-                reel1Div.classList.remove('spinning');
-                reel1Div.innerText = r1;
-            }, 600);
+    // リールを順番に停止させる
+    setTimeout(() => {
+        reel1Div.classList.remove('spinning');
+        reel1Div.innerText = r1;
+    }, 600);
 
-            setTimeout(() => {
-                reel2Div.classList.remove('spinning');
-                reel2Div.innerText = r2;
-            }, 1200);
+    setTimeout(() => {
+        reel2Div.classList.remove('spinning');
+        reel2Div.innerText = r2;
+    }, 1200);
 
-            setTimeout(() => {
-                reel3Div.classList.remove('spinning');
-                reel3Div.innerText = r3;
-                
-                // 全リール停止後に結果判定
-                processSpinResult(r1, r2, r3, isRefund);
-            }, 1800);
-        });
+    setTimeout(() => {
+        reel3Div.classList.remove('spinning');
+        reel3Div.innerText = r3;
+        
+        // 全リール停止後に結果判定
+        processSpinResult(r1, r2, r3, isRefund);
+    }, 1800);
+});
 
         function processSpinResult(r1, r2, r3, isRefund) {
             let baseReward = 0;
