@@ -756,9 +756,7 @@ spinBtn.addEventListener('click', () => {
     spinsLeft--;
 
     playSE('spin'); // ★スピン開始音
-    // ...
-});
-       
+
     // 枠の中の文字（.reel-inner）にアニメーションを付与
     reel1Div.classList.add('spinning');
     reel2Div.classList.add('spinning');
@@ -791,55 +789,52 @@ spinBtn.addEventListener('click', () => {
 });
 
         function processSpinResult(r1, r2, r3, isRefund) {
-            let baseReward = 0;
+    let baseReward = 0;
 
-            // 当たり判定時（揃った時）
-if (isWin) {
-    playSE('win'); // ★当たり音
-}
+    if (isRefund) {
+        setTimeout(() => { alert("🔁 チケットが手元に戻った！"); }, 100);
+    }
 
-            if (isRefund) {
-                setTimeout(() => { alert("🔁 チケットが手元に戻った！"); }, 100);
-            }
-
-            if (r1 === r2 && r2 === r3) {
-                baseReward = (multipliers[r1] || 5) * 3;
-                if (r1 === '7️⃣') {
-                    baseReward *= 2; 
-                    slotMsg.innerText = `🔥 777 JACKPOT! 超大当り +${baseReward * upgrades.multiplier.lv} コイン！`;
-                    triggerFlash();
-                } else if (r1 === '🍀') {
-                    tickets += 2;
-                    slotMsg.innerText = `🍀 クローバーラッシュ！ +${baseReward * upgrades.multiplier.lv} コイン & チケット+2枚！`;
-                } else {
-                    slotMsg.innerText = `🎉 【${r1}】大当り！ +${baseReward * upgrades.multiplier.lv} コイン！`;
-                }
-            } else if (r1 === r2 || r2 === r3 || r1 === r3) {
-                const matchedSymbol = (r1 === r2 || r1 === r3) ? r1 : r2;
-                baseReward = multipliers[matchedSymbol] || 2;
-                slotMsg.innerText = `👍 リーチ賞！ +${baseReward * upgrades.multiplier.lv} コイン`;
-            } else {
-                slotMsg.innerText = "ハズレ... また挑戦しよう！";
-            }
-
-           const earned = baseReward * upgrades.multiplier.lv;
-            coins += earned;
-            totalEarnedCoins += earned; // 通算獲得コインに加算
-
-            // --- ミッション進捗を反映 ---
-            checkMissionProgress({
-                type: 'spin',
-                r1: r1,
-                r2: r2,
-                r3: r3,
-                earned: earned
-            });
-
-            isSpinning = false;
-            checkQuota();
-            updateUI();
-            saveGame();
+    if (r1 === r2 && r2 === r3) {
+        playSE('win'); // ★大当り音
+        baseReward = (multipliers[r1] || 5) * 3;
+        if (r1 === '7️⃣') {
+            baseReward *= 2; 
+            slotMsg.innerText = `🔥 777 JACKPOT! 超大当り +${baseReward * upgrades.multiplier.lv} コイン！`;
+            triggerFlash();
+        } else if (r1 === '🍀') {
+            tickets += 2;
+            slotMsg.innerText = `🍀 クローバーラッシュ！ +${baseReward * upgrades.multiplier.lv} コイン & チケット+2枚！`;
+        } else {
+            slotMsg.innerText = `🎉 【${r1}】大当り！ +${baseReward * upgrades.multiplier.lv} コイン！`;
         }
+    } else if (r1 === r2 || r2 === r3 || r1 === r3) {
+        playSE('win'); // ★リーチ賞音
+        const matchedSymbol = (r1 === r2 || r1 === r3) ? r1 : r2;
+        baseReward = multipliers[matchedSymbol] || 2;
+        slotMsg.innerText = `👍 リーチ賞！ +${baseReward * upgrades.multiplier.lv} コイン`;
+    } else {
+        slotMsg.innerText = "ハズレ... また挑戦しよう！";
+    }
+
+    const earned = baseReward * upgrades.multiplier.lv;
+    coins += earned;
+    totalEarnedCoins += earned; // 通算獲得コインに加算
+
+    // --- ミッション進捗を反映 ---
+    checkMissionProgress({
+        type: 'spin',
+        r1: r1,
+        r2: r2,
+        r3: r3,
+        earned: earned
+    });
+
+    isSpinning = false;
+    checkQuota();
+    updateUI();
+    saveGame();
+}
 
         function triggerFlash() {
             slotContainer.classList.add('flash-effect');
@@ -892,6 +887,7 @@ if (isWin) {
                 coins -= upgrades.luck.cost;
                 upgrades.luck.lv++;
                 upgrades.luck.cost = Math.floor(upgrades.luck.cost * 1.8);
+                playSE('upgrade'); // ★追加
                 checkMissionProgress({ type: 'upgrade' });
                 checkQuota();
                 updateUI();
@@ -904,6 +900,7 @@ if (isWin) {
                 coins -= upgrades.refund.cost;
                 upgrades.refund.lv++;
                 upgrades.refund.cost = Math.floor(upgrades.refund.cost * 2.2);
+                playSE('upgrade'); // ★追加
                 checkMissionProgress({ type: 'upgrade' });
                 checkQuota();
                 updateUI();
@@ -917,6 +914,7 @@ if (isWin) {
                 upgrades.clover.lv++;
                 weights['🍀'] += 10;
                 upgrades.clover.cost = Math.floor(upgrades.clover.cost * 1.6);
+                playSE('upgrade'); // ★追加
                 checkMissionProgress({ type: 'upgrade' });
                 checkQuota();
                 updateUI();
