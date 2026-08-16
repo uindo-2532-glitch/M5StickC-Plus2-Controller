@@ -593,11 +593,31 @@ function releaseWakeLock() {
             // 1秒 = +1 PT / 離脱1秒 = -5 PT
             const rawEarnedPoints = elapsedSec * 1;
             const penaltyPoints = totalPenaltySeconds * 5;
-            const finalEarnedPoints = Math.max(0, rawEarnedPoints - penaltyPoints);
-            const earnedTickets = Math.floor(finalEarnedPoints / 600);
+            
+            // 収支計算（マイナスの場合は既存ポイントからの没収額になる）
+            const netPoints = rawEarnedPoints - penaltyPoints;
+            
+            if (netPoints >= 0) {
+                // プラスの場合はポイント＆チケット獲得
+                points += netPoints;
+                const earnedTickets = Math.floor(netPoints / 600);
+                tickets += earnedTickets;
 
-            points += finalEarnedPoints;
-            tickets += earnedTickets;
+                if (totalPenaltySeconds > 0) {
+                    btnStatusDiv.innerText = `🎉 集中完了！ 獲得: +${rawEarnedPoints} PT (⚠️離脱ペナルティ: -${penaltyPoints} PT) ➔ 合計 +${netPoints} PT & チケット +${earnedTickets} 枚！`;
+                } else if (netPoints > 0) {
+                    btnStatusDiv.innerText = `🎉 パーフェクト集中完了！ +${netPoints} PT & チケット +${earnedTickets} 枚を獲得！`;
+                } else {
+                    btnStatusDiv.innerText = `計測終了（短時間のため報酬なし）`;
+                }
+            } else {
+                // マイナスの場合は所持ポイントから没収（0未満にはならないよう制御）
+                const loss = Math.abs(netPoints);
+                const actualPenalty = Math.min(points, loss);
+                points -= actualPenalty;
+
+                btnStatusDiv.innerText = `💀 集中失敗... 獲得: +${rawEarnedPoints} PT (⚠️離脱ペナルティ: -${penaltyPoints} PT) ➔ 所持PTから -${actualPenalty} PT 没収されました！`;
+            }
 
             isSessionActive = false;
             clearInterval(timerInterval);
@@ -605,14 +625,6 @@ function releaseWakeLock() {
             
             statusDiv.innerText = "計測完了！";
             timerDisplay.innerText = "経過時間: 00:00";
-
-            if (totalPenaltySeconds > 0) {
-                btnStatusDiv.innerText = `🎉 集中完了！ 獲得: +${rawEarnedPoints} PT (⚠️離脱ペナルティ: -${penaltyPoints} PT / 離脱 ${totalPenaltySeconds}秒) ➔ 合計 +${finalEarnedPoints} PT & チケット +${earnedTickets} 枚！`;
-            } else if (finalEarnedPoints > 0) {
-                btnStatusDiv.innerText = `🎉 パーフェクト集中完了！ +${finalEarnedPoints} PT & チケット +${earnedTickets} 枚を獲得！`;
-            } else {
-                btnStatusDiv.innerText = `計測終了（短時間またはペナルティ超過のため報酬なし）`;
-            }
 
             updateUI();
             saveGame();
