@@ -238,8 +238,8 @@
 
             if (currentIntervalCount > lastPointIntervalCount) {
                 const added = (currentIntervalCount - lastPointIntervalCount);
-                points += added * 10;
-                tickets += added; // 30分ごとに1チケット追加！
+                points += added * 10; // 計測によってのみポイント増加
+                tickets += added;    // 30分ごとに1チケット追加
                 lastPointIntervalCount = currentIntervalCount;
                 
                 updateUI();
@@ -257,11 +257,10 @@
         }
 
         function applyPenalty(reason) {
-            if (points > 0) points = Math.floor(points / 2);
+            points = Math.max(0, Math.floor(points / 2)); // 下限0を保証して半減
             btnStatusDiv.innerText = `${reason}: フォーカスPTが半減しました！`;
             updateUI();
         }
-
         // --- スロット処理 ---
         spinBtn.addEventListener('click', () => {
             if (tickets <= 0) return;
@@ -299,7 +298,7 @@
                 slotMsg.innerText = "ハズレ... また挑戦しよう！";
             }
 
-            coins += baseReward * upgrades.multiplier.lv;
+            coins += baseReward * upgrades.multiplier.lv; // コイン(スロットポイント)のみ加算
             updateUI();
         });
 
