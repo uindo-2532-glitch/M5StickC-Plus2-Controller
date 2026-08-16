@@ -25,15 +25,30 @@
         .point-val { font-size: 32px; color: #e67e22; font-weight: bold; }
         .timer-val { font-size: 18px; color: #555; margin-top: 5px; }
 
+        /* ノルマ表示エリア */
+        .stage-box {
+            background: #eef6ff; border: 1px solid #b6d4fe; border-radius: 8px;
+            padding: 10px; margin-bottom: 10px; font-size: 14px;
+        }
+
         /* スロットエリア */
         .slot-container {
             display: flex; justify-content: center; gap: 10px; font-size: 45px;
             background: #222; padding: 15px; border-radius: 10px; margin: 10px 0; color: #fff;
+            transition: background 0.3s;
         }
         .slot-reel {
             width: 70px; height: 70px; line-height: 70px; background: #333;
             border-radius: 8px; border: 2px solid #555;
         }
+
+        /* アニメーション演出 */
+        @keyframes jackpotFlash {
+            0% { background-color: #222; }
+            50% { background-color: #f1c40f; }
+            100% { background-color: #222; }
+        }
+        .flash-effect { animation: jackpotFlash 0.5s 3; }
 
         /* アップグレード グリッド */
         .upgrade-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
@@ -64,10 +79,18 @@
     <!-- ミニゲーム：ローグライクスロット -->
     <div class="card" style="border: 2px solid #f39c12;">
         <h3 style="margin: 0 0 10px 0; color: #d35400;">🎰 Focus Slot</h3>
+
+        <!-- ステージ・ノルマ情報 -->
+        <div class="stage-box">
+            <div><b>ステージ: <span id="stageDisplay">1</span></b></div>
+            <div>目標: <b id="quotaDisplay" style="color:#d35400;">50</b> C (現在: <span id="stageCoinDisplay">0</span> C)</div>
+            <div>残りスピン回数: <b id="spinsLeftDisplay" style="color:#2980b9;">5</b> 回</div>
+        </div>
+
         <div>所持チケット: <b id="ticketDisplay" style="color:#e67e22; font-size:18px;">0</b> 枚</div>
         <div>所持コイン: <b id="coinDisplay" style="color:#f1c40f; font-size:18px;">0</b> C</div>
 
-        <div class="slot-container">
+        <div class="slot-container" id="slotContainer">
             <div class="slot-reel" id="reel1">❓</div>
             <div class="slot-reel" id="reel2">❓</div>
             <div class="slot-reel" id="reel3">❓</div>
@@ -96,7 +119,6 @@
                 <div style="color:#666;">スピン時に確率でチケットが戻ります</div>
                 <button class="btn-upgrade" id="upRefundBtn">強化 (<span id="costRefund">20</span> C)</button>
             </div>
-            <!-- 【新規アイテム追加】幸運のクローバー -->
             <div class="upgrade-item">
                 <div><b>幸運のクローバー</b> (Lv: <span id="lvClover">0</span>)</div>
                 <div style="color:#666;">🍀が出現しやすくなります</div>
@@ -119,12 +141,17 @@
         let tickets = 0;
         let coins = 0;
 
+        // ステージ＆ノルマ管理
+        let stage = 1;
+        let quota = 50;
+        let stageEarnedCoins = 0;
+        let spinsLeft = 5;
+
         let isSessionActive = false;
         let sessionStartTime = null;
         let timerInterval = null;
         let lastPointIntervalCount = 0;
 
-        // アップグレードレベル & コスト（新アイテム clover を追加）
         let upgrades = {
             multiplier: { lv: 1, cost: 10 },
             luck: { lv: 1, cost: 15 },
@@ -132,7 +159,6 @@
             clover: { lv: 0, cost: 25 }
         };
 
-        // 新シンボル・確率設定（重み付け方式）
         const symbols = ['🍒', '🔔', '🍋', '7️⃣', '💀', '💎', '🍀'];
         const multipliers = {
             '🍒': 2,
@@ -167,15 +193,22 @@
         const coinDisplay   = document.getElementById('coinDisplay');
         const spinBtn       = document.getElementById('spinBtn');
         const slotMsg       = document.getElementById('slotMsg');
+        const slotContainer = document.getElementById('slotContainer');
 
         function updateUI() {
             pointDisplay.innerText = `${points} PT`;
             ticketDisplay.innerText = tickets;
             coinDisplay.innerText = coins;
 
+            // ノルマ関連表示
+            document.getElementById('stageDisplay').innerText = stage;
+            document.getElementById('quotaDisplay').innerText = quota;
+            document.getElementById('stageCoinDisplay').innerText = stageEarnedCoins;
+            document.getElementById('spinsLeftDisplay').innerText = spinsLeft;
+
             spinBtn.disabled = tickets <= 0;
 
-            // アップグレードボタンの有効化判定
+            // アップグレードボタン判定
             document.getElementById('upMultiplierBtn').disabled = coins < upgrades.multiplier.cost;
             document.getElementById('upLuckBtn').disabled = coins < upgrades.luck.cost;
             document.getElementById('upRefundBtn').disabled = coins < upgrades.refund.cost || upgrades.refund.lv >= 5;
@@ -191,12 +224,15 @@
             document.getElementById('costClover').innerText = upgrades.clover.cost;
         }
 
-        // --- セーブ & ロード処理 ---
         function saveGame() {
             const saveData = {
                 points: points,
                 tickets: tickets,
                 coins: coins,
+                stage: stage,
+                quota: quota,
+                stageEarnedCoins: stageEarnedCoins,
+                spinsLeft: spinsLeft,
                 upgrades: upgrades,
                 weights: weights
             };
@@ -210,6 +246,10 @@
                 points = saveData.points || 0;
                 tickets = saveData.tickets || 0;
                 coins = saveData.coins || 0;
+                stage = saveData.stage || 1;
+                quota = saveData.quota || 50;
+                stageEarnedCoins = saveData.stageEarnedCoins || 0;
+                spinsLeft = saveData.spinsLeft !== undefined ? saveData.spinsLeft : 5;
                 if (saveData.upgrades) upgrades = Object.assign(upgrades, saveData.upgrades);
                 if (saveData.weights) weights = Object.assign(weights, saveData.weights);
                 updateUI();
@@ -270,7 +310,6 @@
             else if (value === 0) stopSession();
         }
 
-        // 計測ロジック
         function startSession() {
             if (isSessionActive) return;
             isSessionActive = true;
@@ -288,7 +327,7 @@
             const seconds = String(elapsedSec % 60).padStart(2, '0');
             timerDisplay.innerText = `経過時間: ${minutes}:${seconds}`;
 
-            const INTERVAL = 10; // テスト時設定
+            const INTERVAL = 10;
             const currentIntervalCount = Math.floor(elapsedSec / INTERVAL);
 
             if (currentIntervalCount > lastPointIntervalCount) {
@@ -298,7 +337,7 @@
                 lastPointIntervalCount = currentIntervalCount;
                 
                 updateUI();
-                saveGame(); // 自動セーブ
+                saveGame();
                 btnStatusDiv.innerText = `30分達成！ +10PT & チケット+1枚獲得！`;
             }
         }
@@ -310,27 +349,28 @@
             statusDiv.innerText = "計測終了";
             timerDisplay.innerText = "経過時間: 00:00";
             updateUI();
-            saveGame(); // 自動セーブ
+            saveGame();
         }
 
         function applyPenalty(reason) {
             if (points > 0) points = Math.floor(points / 2);
             btnStatusDiv.innerText = `${reason}: フォーカスPTが半減しました！`;
             updateUI();
-            saveGame(); // 自動セーブ
+            saveGame();
         }
 
         // --- スロット処理 ---
         spinBtn.addEventListener('click', () => {
             if (tickets <= 0) return;
 
-            // チケット消費（返還ロジック判定）
             const isRefund = Math.random() < (upgrades.refund.lv * 0.1);
             if (!isRefund) {
                 tickets--;
             } else {
                 slotMsg.innerText = "🔁 チケットが手元に戻った！";
             }
+
+            spinsLeft--;
 
             const r1 = getRandomSymbol();
             const r2 = getRandomSymbol();
@@ -340,12 +380,25 @@
             document.getElementById('reel2').innerText = r2;
             document.getElementById('reel3').innerText = r3;
 
-            // 判定
             let baseReward = 0;
+
+            // --- シナジー演出 & 配当判定 ---
             if (r1 === r2 && r2 === r3) {
-                // 3つ揃い
+                // 3つ揃い（コンボシナジー）
                 baseReward = (multipliers[r1] || 5) * 3;
-                slotMsg.innerText = `🎉 【${r1}】大当たり！ +${baseReward * upgrades.multiplier.lv} コイン！`;
+
+                if (r1 === '7️⃣') {
+                    // 777: ジャックポット演出
+                    baseReward *= 2; 
+                    slotMsg.innerText = `🔥 777 JACKPOT! 超大当り +${baseReward * upgrades.multiplier.lv} コイン！`;
+                    triggerFlash();
+                } else if (r1 === '🍀') {
+                    // 🍀3つ: 幸運ラッシュ（追加チケット）
+                    tickets += 2;
+                    slotMsg.innerText = `🍀 クローバーラッシュ！ +${baseReward * upgrades.multiplier.lv} コイン & チケット+2枚！`;
+                } else {
+                    slotMsg.innerText = `🎉 【${r1}】大当り！ +${baseReward * upgrades.multiplier.lv} コイン！`;
+                }
             } else if (r1 === r2 || r2 === r3 || r1 === r3) {
                 // 2つ揃い
                 const matchedSymbol = (r1 === r2 || r1 === r3) ? r1 : r2;
@@ -355,14 +408,54 @@
                 slotMsg.innerText = "ハズレ... また挑戦しよう！";
             }
 
-            coins += baseReward * upgrades.multiplier.lv;
+            const earned = baseReward * upgrades.multiplier.lv;
+            coins += earned;
+            stageEarnedCoins += earned;
+
+            // ノルマ達成判定
+            checkQuota();
+
             updateUI();
-            saveGame(); // 自動セーブ
+            saveGame();
         });
 
-        // 重み付きランダム選出関数
+        // 画面フラッシュ演出
+        function triggerFlash() {
+            slotContainer.classList.add('flash-effect');
+            setTimeout(() => {
+                slotContainer.classList.remove('flash-effect');
+            }, 1500);
+        }
+
+        // ノルマ判定処理
+        function checkQuota() {
+            if (stageEarnedCoins >= quota) {
+                // クリア！
+                setTimeout(() => {
+                    alert(`🎉 ステージ ${stage} クリア！ ボーナスチケット+3枚獲得！`);
+                    stage++;
+                    quota = Math.floor(quota * 1.8);
+                    stageEarnedCoins = 0;
+                    spinsLeft = 5;
+                    tickets += 3;
+                    updateUI();
+                    saveGame();
+                }, 300);
+            } else if (spinsLeft <= 0) {
+                // ノルマ未達成（リセット）
+                setTimeout(() => {
+                    alert(`😭 ノルマ未達成... ステージ1から再挑戦です。`);
+                    stage = 1;
+                    quota = 50;
+                    stageEarnedCoins = 0;
+                    spinsLeft = 5;
+                    updateUI();
+                    saveGame();
+                }, 300);
+            }
+        }
+
         function getRandomSymbol() {
-            // Luckレベルに応じて高配当の重みを加算
             const currentWeights = { ...weights };
             currentWeights['💎'] += (upgrades.luck.lv - 1) * 3;
             currentWeights['🔔'] += (upgrades.luck.lv - 1) * 5;
@@ -411,12 +504,11 @@
             }
         });
 
-        // 幸運のクローバー強化処理
         document.getElementById('upCloverBtn').addEventListener('click', () => {
             if (coins >= upgrades.clover.cost) {
                 coins -= upgrades.clover.cost;
                 upgrades.clover.lv++;
-                weights['🍀'] += 10; // 🍀の重みを増加
+                weights['🍀'] += 10;
                 upgrades.clover.cost = Math.floor(upgrades.clover.cost * 1.6);
                 updateUI();
                 saveGame();
@@ -427,7 +519,6 @@
             navigator.serviceWorker.register('sw.js');
         }
 
-        // 初回読み込み時にデータ復元
         window.addEventListener('load', () => {
             loadGame();
         });
