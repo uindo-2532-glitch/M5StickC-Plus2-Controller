@@ -549,8 +549,7 @@ function checkMissionProgress(eventData) {
 
        // --- アニメーション付きスロット処理 ---
 spinBtn.addEventListener('click', () => {
-    if (tickets <= 0 || isSpinning) return;
-
+    if (tickets <= 0 || isSpinning || isAnimating) return;
     isSpinning = true;
     updateUI();
 
