@@ -583,7 +583,7 @@ spinBtn.addEventListener('click', () => {
             }, 1500);
         }
 
-        function checkQuota() {
+   function checkQuota() {
             // ミッション達成判定
             if (currentMission.currentVal >= currentMission.targetVal) {
                 setTimeout(() => {
@@ -606,6 +606,42 @@ spinBtn.addEventListener('click', () => {
                 }, 500);
             }
         }
+        document.getElementById('upLuckBtn').addEventListener('click', () => {
+            if (coins >= upgrades.luck.cost && !isSpinning) {
+                coins -= upgrades.luck.cost;
+                upgrades.luck.lv++;
+                upgrades.luck.cost = Math.floor(upgrades.luck.cost * 1.8);
+                checkMissionProgress({ type: 'upgrade' });
+                checkQuota();
+                updateUI();
+                saveGame();
+            }
+        });
+
+        document.getElementById('upRefundBtn').addEventListener('click', () => {
+            if (coins >= upgrades.refund.cost && upgrades.refund.lv < 5 && !isSpinning) {
+                coins -= upgrades.refund.cost;
+                upgrades.refund.lv++;
+                upgrades.refund.cost = Math.floor(upgrades.refund.cost * 2.2);
+                checkMissionProgress({ type: 'upgrade' });
+                checkQuota();
+                updateUI();
+                saveGame();
+            }
+        });
+
+        document.getElementById('upCloverBtn').addEventListener('click', () => {
+            if (coins >= upgrades.clover.cost && !isSpinning) {
+                coins -= upgrades.clover.cost;
+                upgrades.clover.lv++;
+                weights['🍀'] += 10;
+                upgrades.clover.cost = Math.floor(upgrades.clover.cost * 1.6);
+                checkMissionProgress({ type: 'upgrade' });
+                checkQuota();
+                updateUI();
+                saveGame();
+            }
+        });
 
         document.getElementById('upLuckBtn').addEventListener('click', () => {
             if (coins >= upgrades.luck.cost && !isSpinning) {
@@ -643,9 +679,6 @@ spinBtn.addEventListener('click', () => {
                 saveGame();
             }
         });
-                }, 500);
-            }
-        }
 
         function getRandomSymbol() {
             const currentWeights = { ...weights };
@@ -670,9 +703,9 @@ spinBtn.addEventListener('click', () => {
             navigator.serviceWorker.register('sw.js');
         }
 
-        window.addEventListener('load', () => {
+       window.addEventListener('load', () => {
             loadGame();
-            if (!currentMission.text) {
+            if (!currentMission || !currentMission.text) {
                 currentMission = generateMission(stage);
             }
             updateUI();
