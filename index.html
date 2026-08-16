@@ -115,10 +115,13 @@
     <div class="card" style="border: 2px solid #f39c12;">
         <h3 style="margin: 0 0 10px 0; color: #d35400;">🎰 Focus Slot</h3>
 
-        <!-- ステージ・ノルマ情報 -->
+       <!-- ステージ・ミッション情報 -->
         <div class="stage-box">
             <div><b>ステージ: <span id="stageDisplay">1</span></b></div>
-            <div>目標: <b id="quotaDisplay" style="color:#d35400;">50</b> C (現在: <span id="stageCoinDisplay">0</span> C)</div>
+            <div style="margin: 4px 0; color: #d35400;">
+                <b>🎯 ミッション: <span id="missionTextDisplay">---</span></b>
+            </div>
+            <div>進捗: <b id="missionProgressDisplay" style="color:#27ae60;">0 / 0</b></div>
             <div>残りスピン回数: <b id="spinsLeftDisplay" style="color:#2980b9;">5</b> 回</div>
         </div>
 
@@ -176,11 +179,95 @@
         let tickets = 0;
         let coins = 0;
 
-        // ステージ＆ノルマ管理
-        let stage = 1;
-        let quota = 50;
-        let stageEarnedCoins = 0;
-        let spinsLeft = 5;
+        // --- ミッション・ステータス管理 ---
+let stage = 1;
+let spinsLeft = 5;
+
+// ミッションの初期データ構造
+let currentMission = {
+    text: "",
+    type: "",       // 'coin', 'align', 'appear', 'upgrade', 'reach'
+    targetVal: 0,
+    currentVal: 0,
+    targetSymbol: null
+};
+
+// ミッション自動生成関数
+function generateMission(stageNum) {
+    const types = ['coin', 'align', 'appear', 'upgrade', 'reach'];
+    const chosenType = types[Math.floor(Math.random() * types.length)];
+
+    if (chosenType === 'coin') {
+        const target = stageNum * 35 + 15;
+        return {
+            text: `${target} C 稼ぐ`,
+            type: 'coin',
+            targetVal: target,
+            currentVal: 0
+        };
+    } else if (chosenType === 'align') {
+        const syms = ['🍒', '🔔', '🍋'];
+        const s = syms[Math.floor(Math.random() * syms.length)];
+        return {
+            text: `${s} を1回揃える`,
+            type: 'align',
+            targetSymbol: s,
+            targetVal: 1,
+            currentVal: 0
+        };
+    } else if (chosenType === 'appear') {
+        const syms = ['🍀', '💎', '7️⃣'];
+        const s = syms[Math.floor(Math.random() * syms.length)];
+        return {
+            text: `${s} を通算2回出す`,
+            type: 'appear',
+            targetSymbol: s,
+            targetVal: 2,
+            currentVal: 0
+        };
+    } else if (chosenType === 'upgrade') {
+        return {
+            text: `スロットを1回強化する`,
+            type: 'upgrade',
+            targetVal: 1,
+            currentVal: 0
+        };
+    } else if (chosenType === 'reach') {
+        return {
+            text: `リーチ(2個一致)を2回出す`,
+            type: 'reach',
+            targetVal: 2,
+            currentVal: 0
+        };
+    }
+}
+
+// ミッション進捗チェック関数
+function checkMissionProgress(eventData) {
+    // eventData: { type: 'spin', r1, r2, r3, earned } や { type: 'upgrade' }
+    if (currentMission.type === 'coin' && eventData.type === 'spin') {
+        currentMission.currentVal += eventData.earned;
+    } else if (currentMission.type === 'align' && eventData.type === 'spin') {
+        if (eventData.r1 === currentMission.targetSymbol && 
+            eventData.r2 === currentMission.targetSymbol && 
+            eventData.r3 === currentMission.targetSymbol) {
+            currentMission.currentVal += 1;
+        }
+    } else if (currentMission.type === 'appear' && eventData.type === 'spin') {
+        let count = 0;
+        if (eventData.r1 === currentMission.targetSymbol) count++;
+        if (eventData.r2 === currentMission.targetSymbol) count++;
+        if (eventData.r3 === currentMission.targetSymbol) count++;
+        currentMission.currentVal += count;
+    } else if (currentMission.type === 'upgrade' && eventData.type === 'upgrade') {
+        currentMission.currentVal += 1;
+    } else if (currentMission.type === 'reach' && eventData.type === 'spin') {
+        if ((eventData.r1 === eventData.r2 || eventData.r2 === eventData.r3 || eventData.r1 === eventData.r3) &&
+            !(eventData.r1 === eventData.r2 && eventData.r2 === eventData.r3)) {
+            currentMission.currentVal += 1;
+        }
+    }
+}
 
         // アニメーション制御用フラグ
         let isSpinning = false;
@@ -243,8 +330,8 @@
             coinDisplay.innerText = coins;
 
             document.getElementById('stageDisplay').innerText = stage;
-            document.getElementById('quotaDisplay').innerText = quota;
-            document.getElementById('stageCoinDisplay').innerText = stageEarnedCoins;
+            document.getElementById('missionTextDisplay').innerText = currentMission.text;
+            document.getElementById('missionProgressDisplay').innerText = `${currentMission.currentVal} / ${currentMission.targetVal}`;
             document.getElementById('spinsLeftDisplay').innerText = spinsLeft;
 
             // スピン中はボタンを無効化
@@ -262,9 +349,8 @@
             document.getElementById('lvRefund').innerText = upgrades.refund.lv;
             document.getElementById('costRefund').innerText = upgrades.refund.cost;
             document.getElementById('lvClover').innerText = upgrades.clover.lv;
-            document.getElementById('costClover').innerText = upgrades.clover.cost;
+            document.getElementById('costClover').innerText = upgrades.costClover || upgrades.clover.cost;
         }
-
         function saveGame() {
             const saveData = {
                 points: points,
@@ -473,9 +559,17 @@ spinBtn.addEventListener('click', () => {
                 slotMsg.innerText = "ハズレ... また挑戦しよう！";
             }
 
-            const earned = baseReward * upgrades.multiplier.lv;
+           const earned = baseReward * upgrades.multiplier.lv;
             coins += earned;
-            stageEarnedCoins += earned;
+
+            // --- ミッション進捗を反映 ---
+            checkMissionProgress({
+                type: 'spin',
+                r1: r1,
+                r2: r2,
+                r3: r3,
+                earned: earned
+            });
 
             isSpinning = false;
             checkQuota();
@@ -511,6 +605,55 @@ spinBtn.addEventListener('click', () => {
                     spinsLeft = 5;
                     updateUI();
                     saveGame();
+                    // --- アップグレード処理 ---
+        document.getElementById('upMultiplierBtn').addEventListener('click', () => {
+            if (coins >= upgrades.multiplier.cost && !isSpinning) {
+                coins -= upgrades.multiplier.cost;
+                upgrades.multiplier.lv++;
+                upgrades.multiplier.cost = Math.floor(upgrades.multiplier.cost * 1.8);
+                checkMissionProgress({ type: 'upgrade' });
+                checkQuota();
+                updateUI();
+                saveGame();
+            }
+        });
+
+        document.getElementById('upLuckBtn').addEventListener('click', () => {
+            if (coins >= upgrades.luck.cost && !isSpinning) {
+                coins -= upgrades.luck.cost;
+                upgrades.luck.lv++;
+                upgrades.luck.cost = Math.floor(upgrades.luck.cost * 1.8);
+                checkMissionProgress({ type: 'upgrade' });
+                checkQuota();
+                updateUI();
+                saveGame();
+            }
+        });
+
+        document.getElementById('upRefundBtn').addEventListener('click', () => {
+            if (coins >= upgrades.refund.cost && upgrades.refund.lv < 5 && !isSpinning) {
+                coins -= upgrades.refund.cost;
+                upgrades.refund.lv++;
+                upgrades.refund.cost = Math.floor(upgrades.refund.cost * 2.2);
+                checkMissionProgress({ type: 'upgrade' });
+                checkQuota();
+                updateUI();
+                saveGame();
+            }
+        });
+
+        document.getElementById('upCloverBtn').addEventListener('click', () => {
+            if (coins >= upgrades.clover.cost && !isSpinning) {
+                coins -= upgrades.clover.cost;
+                upgrades.clover.lv++;
+                weights['🍀'] += 10;
+                upgrades.clover.cost = Math.floor(upgrades.clover.cost * 1.6);
+                checkMissionProgress({ type: 'upgrade' });
+                checkQuota();
+                updateUI();
+                saveGame();
+            }
+        });
                 }, 500);
             }
         }
@@ -581,6 +724,10 @@ spinBtn.addEventListener('click', () => {
 
         window.addEventListener('load', () => {
             loadGame();
+            if (!currentMission.text) {
+                currentMission = generateMission(stage);
+            }
+            updateUI();
         });
     </script>
 </body>
