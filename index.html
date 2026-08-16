@@ -183,14 +183,15 @@
 let stage = 1;
 let spinsLeft = 5;
 
-// ミッションの初期データ構造
 let currentMission = {
     text: "",
-    type: "",       // 'coin', 'align', 'appear', 'upgrade', 'reach'
+    type: "",
     targetVal: 0,
     currentVal: 0,
     targetSymbol: null
 };
+let quota = 50; // データ保存のエラー防止用
+let stageEarnedCoins = 0;
 
 // ミッション自動生成関数
 function generateMission(stageNum) {
@@ -351,15 +352,14 @@ function checkMissionProgress(eventData) {
             document.getElementById('lvClover').innerText = upgrades.clover.lv;
             document.getElementById('costClover').innerText = upgrades.costClover || upgrades.clover.cost;
         }
-        function saveGame() {
+      function saveGame() {
             const saveData = {
                 points: points,
                 tickets: tickets,
                 coins: coins,
                 stage: stage,
-                quota: quota,
-                stageEarnedCoins: stageEarnedCoins,
                 spinsLeft: spinsLeft,
+                currentMission: currentMission,
                 upgrades: upgrades,
                 weights: weights
             };
@@ -374,9 +374,8 @@ function checkMissionProgress(eventData) {
                 tickets = saveData.tickets || 0;
                 coins = saveData.coins || 0;
                 stage = saveData.stage || 1;
-                quota = saveData.quota || 50;
-                stageEarnedCoins = saveData.stageEarnedCoins || 0;
                 spinsLeft = saveData.spinsLeft !== undefined ? saveData.spinsLeft : 5;
+                if (saveData.currentMission) currentMission = saveData.currentMission;
                 if (saveData.upgrades) upgrades = Object.assign(upgrades, saveData.upgrades);
                 if (saveData.weights) weights = Object.assign(weights, saveData.weights);
                 updateUI();
@@ -585,38 +584,28 @@ spinBtn.addEventListener('click', () => {
         }
 
         function checkQuota() {
-            if (stageEarnedCoins >= quota) {
+            // ミッション達成判定
+            if (currentMission.currentVal >= currentMission.targetVal) {
                 setTimeout(() => {
-                    alert(`🎉 ステージ ${stage} クリア！ ボーナスチケット+3枚獲得！`);
+                    alert(`🎉 ミッションクリア！ ボーナスチケット+3枚獲得！`);
                     stage++;
-                    quota = Math.floor(quota * 1.8);
-                    stageEarnedCoins = 0;
                     spinsLeft = 5;
                     tickets += 3;
+                    currentMission = generateMission(stage);
                     updateUI();
                     saveGame();
                 }, 500);
             } else if (spinsLeft <= 0) {
                 setTimeout(() => {
-                    alert(`😭 ノルマ未達成... ステージ1から再挑戦です。`);
+                    alert(`😭 残りスピンなし... ミッション失敗！ ステージ1からやり直しです。`);
                     stage = 1;
-                    quota = 50;
-                    stageEarnedCoins = 0;
                     spinsLeft = 5;
+                    currentMission = generateMission(1);
                     updateUI();
                     saveGame();
-                    // --- アップグレード処理 ---
-        document.getElementById('upMultiplierBtn').addEventListener('click', () => {
-            if (coins >= upgrades.multiplier.cost && !isSpinning) {
-                coins -= upgrades.multiplier.cost;
-                upgrades.multiplier.lv++;
-                upgrades.multiplier.cost = Math.floor(upgrades.multiplier.cost * 1.8);
-                checkMissionProgress({ type: 'upgrade' });
-                checkQuota();
-                updateUI();
-                saveGame();
+                }, 500);
             }
-        });
+        }
 
         document.getElementById('upLuckBtn').addEventListener('click', () => {
             if (coins >= upgrades.luck.cost && !isSpinning) {
@@ -676,48 +665,7 @@ spinBtn.addEventListener('click', () => {
             return '🍒';
         }
 
-        // --- アップグレード処理 ---
-        document.getElementById('upMultiplierBtn').addEventListener('click', () => {
-            if (coins >= upgrades.multiplier.cost && !isSpinning) {
-                coins -= upgrades.multiplier.cost;
-                upgrades.multiplier.lv++;
-                upgrades.multiplier.cost = Math.floor(upgrades.multiplier.cost * 1.8);
-                updateUI();
-                saveGame();
-            }
-        });
-
-        document.getElementById('upLuckBtn').addEventListener('click', () => {
-            if (coins >= upgrades.luck.cost && !isSpinning) {
-                coins -= upgrades.luck.cost;
-                upgrades.luck.lv++;
-                upgrades.luck.cost = Math.floor(upgrades.luck.cost * 1.8);
-                updateUI();
-                saveGame();
-            }
-        });
-
-        document.getElementById('upRefundBtn').addEventListener('click', () => {
-            if (coins >= upgrades.refund.cost && upgrades.refund.lv < 5 && !isSpinning) {
-                coins -= upgrades.refund.cost;
-                upgrades.refund.lv++;
-                upgrades.refund.cost = Math.floor(upgrades.refund.cost * 2.2);
-                updateUI();
-                saveGame();
-            }
-        });
-
-        document.getElementById('upCloverBtn').addEventListener('click', () => {
-            if (coins >= upgrades.clover.cost && !isSpinning) {
-                coins -= upgrades.clover.cost;
-                upgrades.clover.lv++;
-                weights['🍀'] += 10;
-                upgrades.clover.cost = Math.floor(upgrades.clover.cost * 1.6);
-                updateUI();
-                saveGame();
-            }
-        });
-
+    
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
         }
