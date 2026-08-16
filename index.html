@@ -6,44 +6,100 @@
     <title>M5StickC BLE PWA</title>
     <link rel="manifest" href="manifest.json">
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f0f0f0; }
-        button { padding: 15px 25px; font-size: 16px; margin: 10px; border-radius: 5px; border: none; cursor: pointer; }
+        body { font-family: sans-serif; text-align: center; padding: 15px; background: #f4f6f9; color: #333; }
+        button { padding: 12px 20px; font-size: 15px; margin: 5px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
         .btn-connect { background: #007bff; color: white; }
         .btn-on { background: #28a745; color: white; }
         .btn-off { background: #dc3545; color: white; }
-        #status { font-weight: bold; margin-top: 20px; color: #555; }
-        
-        .point-box {
-            background: #fff;
-            border-radius: 10px;
-            padding: 20px;
-            margin: 20px auto;
-            max-width: 300px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        .btn-spin { background: #f39c12; color: white; font-size: 18px; padding: 12px 30px; width: 80%; max-width: 250px; }
+        .btn-spin:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-upgrade { background: #8e44ad; color: white; font-size: 13px; padding: 8px 12px; margin-top: 5px; }
+        .btn-upgrade:disabled { background: #bbb; }
+
+        #status { font-weight: bold; margin-top: 15px; color: #666; }
+
+        .card {
+            background: #fff; border-radius: 12px; padding: 15px; margin: 15px auto;
+            max-width: 340px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         }
-        .point-val { font-size: 40px; color: #e67e22; font-weight: bold; }
-        .timer-val { font-size: 20px; color: #333; margin-top: 10px; }
+        .point-val { font-size: 32px; color: #e67e22; font-weight: bold; }
+        .timer-val { font-size: 18px; color: #555; margin-top: 5px; }
+
+        /* スロットエリア */
+        .slot-container {
+            display: flex; justify-content: center; gap: 10px; font-size: 45px;
+            background: #222; padding: 15px; border-radius: 10px; margin: 10px 0; color: #fff;
+        }
+        .slot-reel {
+            width: 70px; height: 70px; line-height: 70px; background: #333;
+            border-radius: 8px; border: 2px solid #555;
+        }
+
+        /* アップグレード グリッド */
+        .upgrade-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+        .upgrade-item {
+            background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px;
+            padding: 10px; text-align: left; font-size: 13px;
+        }
     </style>
 </head>
 <body>
 
-    <h1>M5StickC Plus2 Controller</h1>
-    
+    <h2>M5StickC Focus Tracker</h2>
+
     <button class="btn-connect" id="connectBtn">M5Stackに接続</button>
-    <br><br>
+    <br>
     <button class="btn-on" id="ledOnBtn" disabled>LED 点灯</button>
     <button class="btn-off" id="ledOffBtn" disabled>LED 消灯</button>
 
     <div id="status">ステータス: 未接続</div>
 
-    <div class="point-box">
-        <div>現在のポイント</div>
+    <!-- メイン実績＆タイマー -->
+    <div class="card">
+        <div style="font-size:12px; color:#888;">累計フォーカス実績</div>
         <div class="point-val" id="pointDisplay">0 PT</div>
         <div class="timer-val" id="timerDisplay">経過時間: 00:00</div>
     </div>
 
-    <div id="btnStatus" style="font-size: 20px; margin-top: 20px;">---</div>
-    <div id="btnImg" style="font-size: 24px; margin-top: 10px;"></div>
+    <!-- ミニゲーム：ローグライクスロット -->
+    <div class="card" style="border: 2px solid #f39c12;">
+        <h3 style="margin: 0 0 10px 0; color: #d35400;">🎰 Focus Slot</h3>
+        <div>所持チケット: <b id="ticketDisplay" style="color:#e67e22; font-size:18px;">0</b> 枚</div>
+        <div>所持コイン: <b id="coinDisplay" style="color:#f1c40f; font-size:18px;">0</b> C</div>
+
+        <div class="slot-container">
+            <div class="slot-reel" id="reel1">❓</div>
+            <div class="slot-reel" id="reel2">❓</div>
+            <div class="slot-reel" id="reel3">❓</div>
+        </div>
+
+        <button class="btn-spin" id="spinBtn" disabled>スピン (1枚消費)</button>
+        <div id="slotMsg" style="margin-top: 8px; font-weight: bold; min-height: 20px;"></div>
+
+        <!-- ローグライク補正（アップグレード） -->
+        <hr style="border:0; border-top:1px solid #eee; margin:15px 0;">
+        <div style="font-weight:bold; font-size:14px;">🛠️ スロット強化（コイン消費）</div>
+        
+        <div class="upgrade-grid">
+            <div class="upgrade-item">
+                <div><b>配当倍率 UP</b> (Lv: <span id="lvMultiplier">1</span>)</div>
+                <div style="color:#666;">獲得コイン量が増加します</div>
+                <button class="btn-upgrade" id="upMultiplierBtn">強化 (<span id="costMultiplier">10</span> C)</button>
+            </div>
+            <div class="upgrade-item">
+                <div><b>レア絵柄率 UP</b> (Lv: <span id="lvLuck">1</span>)</div>
+                <div style="color:#666;">🔔 や 💎 が揃いやすくなります</div>
+                <button class="btn-upgrade" id="upLuckBtn">強化 (<span id="costLuck">15</span> C)</button>
+            </div>
+            <div class="upgrade-item">
+                <div><b>チケット再利用率</b> (Lv: <span id="lvRefund">0</span>)</div>
+                <div style="color:#666;">スピン時に確率でチケットが戻ります</div>
+                <button class="btn-upgrade" id="upRefundBtn">強化 (<span id="costRefund">20</span> C)</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="btnStatus" style="font-size: 14px; margin-top: 10px; color:#666;">---</div>
 
     <script>
         const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
@@ -52,28 +108,60 @@
         let bluetoothDevice = null;
         let dataCharacteristic = null;
 
-        // システム状態変数
+        // システム状態
         let points = 0;
-        let isSessionActive = false; // Aボタン（開始）〜Bボタン（終了）のセッション中か
+        let tickets = 0;
+        let coins = 0;
+
+        let isSessionActive = false;
         let sessionStartTime = null;
         let timerInterval = null;
-        let lastPointIntervalCount = 0; // 何回30分ポイントを受け取ったか
+        let lastPointIntervalCount = 0;
 
-        const connectBtn     = document.getElementById('connectBtn');
-        const ledOnBtn       = document.getElementById('ledOnBtn');
-        const ledOffBtn      = document.getElementById('ledOffBtn');
-        const statusDiv      = document.getElementById('status');
-        const btnStatusDiv   = document.getElementById('btnStatus');
-        const btnStatusImg   = document.getElementById('btnImg');
-        const pointDisplay   = document.getElementById('pointDisplay');
-        const timerDisplay   = document.getElementById('timerDisplay');
+        // アップグレードレベル & コスト
+        let upgrades = {
+            multiplier: { lv: 1, cost: 10 },
+            luck: { lv: 1, cost: 15 },
+            refund: { lv: 0, cost: 20 }
+        };
 
-        // UI更新関数
+        const SYMBOLS = ["🍒", "🍋", "🍇", "🔔", "💎"];
+
+        // DOM要素
+        const connectBtn   = document.getElementById('connectBtn');
+        const ledOnBtn     = document.getElementById('ledOnBtn');
+        const ledOffBtn    = document.getElementById('ledOffBtn');
+        const statusDiv    = document.getElementById('status');
+        const btnStatusDiv = document.getElementById('btnStatus');
+        const pointDisplay = document.getElementById('pointDisplay');
+        const timerDisplay = document.getElementById('timerDisplay');
+        
+        const ticketDisplay = document.getElementById('ticketDisplay');
+        const coinDisplay   = document.getElementById('coinDisplay');
+        const spinBtn       = document.getElementById('spinBtn');
+        const slotMsg       = document.getElementById('slotMsg');
+
         function updateUI() {
             pointDisplay.innerText = `${points} PT`;
+            ticketDisplay.innerText = tickets;
+            coinDisplay.innerText = coins;
+
+            spinBtn.disabled = tickets <= 0;
+
+            // アップグレードボタンの有効化判定
+            document.getElementById('upMultiplierBtn').disabled = coins < upgrades.multiplier.cost;
+            document.getElementById('upLuckBtn').disabled = coins < upgrades.luck.cost;
+            document.getElementById('upRefundBtn').disabled = coins < upgrades.refund.cost || upgrades.refund.lv >= 5;
+
+            document.getElementById('lvMultiplier').innerText = upgrades.multiplier.lv;
+            document.getElementById('costMultiplier').innerText = upgrades.multiplier.cost;
+            document.getElementById('lvLuck').innerText = upgrades.luck.lv;
+            document.getElementById('costLuck').innerText = upgrades.luck.cost;
+            document.getElementById('lvRefund').innerText = upgrades.refund.lv;
+            document.getElementById('costRefund').innerText = upgrades.refund.cost;
         }
 
-        // BLE接続処理
+        // BLE 接続処理
         connectBtn.addEventListener('click', async () => {
             try {
                 statusDiv.innerText = "デバイスを探しています...";
@@ -82,7 +170,6 @@
                     optionalServices: [SERVICE_UUID]
                 });
 
-                // 切断イベント検知（スマホアプリ最小化などでBLEが切れた時）
                 bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
 
                 statusDiv.innerText = "接続中...";
@@ -90,7 +177,6 @@
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 dataCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
-                // Notifyの受信設定
                 await dataCharacteristic.startNotifications();
                 dataCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
 
@@ -103,20 +189,17 @@
             }
         });
 
-        // 意図しない切断（バックグラウンド移行など）の処理
         function onDisconnected() {
             statusDiv.innerText = "切断されました！";
             ledOnBtn.disabled = true;
             ledOffBtn.disabled = true;
 
-            // セッション実行中に切断された場合のペナルティ処理
             if (isSessionActive) {
-                applyPenalty("切断（最小化など）によりペナルティ適用");
+                applyPenalty("切断ペナルティ");
                 stopSession();
             }
         }
 
-        // スマホからM5へのデータ送信 (Write)
         async function sendData(value) {
             if (!dataCharacteristic) return;
             const encoder = new TextEncoder();
@@ -126,73 +209,46 @@
         ledOnBtn.addEventListener('click', () => sendData('1'));
         ledOffBtn.addEventListener('click', () => sendData('0'));
 
-        // M5からのデータ受信ハンドラ (Notify)
         function handleNotifications(event) {
             const value = event.target.value.getUint8(0);
-
-            if (value === 1) { // ボタンA（開始）
-                btnStatusDiv.innerText = "M5のボタンA（開始）が押されました！";
-                btnStatusDiv.style.color = "#007bff";
-                btnStatusImg.innerHTML = '<img src="1.jpg" width="100">';
-
-                startSession();
-
-            } else if (value === 0) { // ボタンB（終了）
-                btnStatusDiv.innerText = "M5のボタンB（終了）が押されました！";
-                btnStatusDiv.style.color = "#ff7bff";
-                btnStatusImg.innerHTML = '<img src="2.jpg" width="100">';
-
-                stopSession();
-            }
+            if (value === 1) startSession();
+            else if (value === 0) stopSession();
         }
 
-        // --- セッション・ポイント計算ロジック ---
-
-        // 計測開始
+        // 計測ロジック
         function startSession() {
-            if (isSessionActive) return; // 既に開始されている場合は無視
-
+            if (isSessionActive) return;
             isSessionActive = true;
             sessionStartTime = Date.now();
             lastPointIntervalCount = 0;
-            
             statusDiv.innerText = "計測中...";
-
-            // 1秒周期でタイマー・ポイントチェック更新
             timerInterval = setInterval(checkSessionProgress, 1000);
         }
 
-        // 計測進行チェック（1秒ごとに実行）
         function checkSessionProgress() {
             if (!isSessionActive) return;
-
             const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
             
-            // 経過時間表示の更新 (MM:SS)
             const minutes = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
             const seconds = String(elapsedSec % 60).padStart(2, '0');
             timerDisplay.innerText = `経過時間: ${minutes}:${seconds}`;
 
-            // 30分（1800秒）ごとの加算判定
-            // ※テスト時に短い時間で試したい場合は 1800 を 10（10秒）などに変更してください
-            const INTERVAL = 10; // 30分 = 1800秒
+            const INTERVAL = 10; // 30分 (テスト時は10秒等に変更可)
             const currentIntervalCount = Math.floor(elapsedSec / INTERVAL);
 
             if (currentIntervalCount > lastPointIntervalCount) {
-                // 30分経過するごとに +10 ポイント
-                const addedPoints = (currentIntervalCount - lastPointIntervalCount) * 10;
-                points += addedPoints;
+                const added = (currentIntervalCount - lastPointIntervalCount);
+                points += added * 10;
+                tickets += added; // 30分ごとに1チケット追加！
                 lastPointIntervalCount = currentIntervalCount;
                 
                 updateUI();
-                btnStatusDiv.innerText = `30分経過！ +${addedPoints}ポイント獲得！`;
+                btnStatusDiv.innerText = `30分達成！ +10PT & チケット+1枚獲得！`;
             }
         }
 
-        // 計測正常終了 (ボタンB)
         function stopSession() {
             if (!isSessionActive) return;
-
             isSessionActive = false;
             clearInterval(timerInterval);
             statusDiv.innerText = "計測終了";
@@ -200,21 +256,97 @@
             updateUI();
         }
 
-        // ペナルティ適用ロジック
         function applyPenalty(reason) {
-            if (points === 0) {
-                btnStatusDiv.innerText = `${reason}: ポイントなしのため加算なし`;
-            } else {
-                points = Math.floor(points / 2); // ポイント半減（端数切り捨て）
-                btnStatusDiv.innerText = `${reason}: ポイントが半減しました！`;
-            }
+            if (points > 0) points = Math.floor(points / 2);
+            btnStatusDiv.innerText = `${reason}: フォーカスPTが半減しました！`;
             updateUI();
         }
 
-        // Service Workerの登録 (PWA用)
+        // --- スロット処理 ---
+        spinBtn.addEventListener('click', () => {
+            if (tickets <= 0) return;
+
+            // チケット消費（返還ロジック判定）
+            const isRefund = Math.random() < (upgrades.refund.lv * 0.1);
+            if (!isRefund) {
+                tickets--;
+            } else {
+                slotMsg.innerText = "🔁 チケットが手元に戻った！";
+            }
+
+            // ランダムにリール決定（Luckレベルでレア率補正）
+            const r1 = getRandomSymbol();
+            const r2 = getRandomSymbol();
+            const r3 = getRandomSymbol();
+
+            document.getElementById('reel1').innerText = r1;
+            document.getElementById('reel2').innerText = r2;
+            document.getElementById('reel3').innerText = r3;
+
+            // 判定
+            let baseReward = 0;
+            if (r1 === r2 && r2 === r3) {
+                // 3つ揃い
+                if (r1 === "💎") baseReward = 50;
+                else if (r1 === "🔔") baseReward = 30;
+                else baseReward = 15;
+                slotMsg.innerText = `🎉 大当たり！ +${baseReward * upgrades.multiplier.lv} コイン！`;
+            } else if (r1 === r2 || r2 === r3 || r1 === r3) {
+                // 2つ揃い
+                baseReward = 3;
+                slotMsg.innerText = `👍 リーチ賞！ +${baseReward * upgrades.multiplier.lv} コイン`;
+            } else {
+                slotMsg.innerText = "ハズレ... また挑戦しよう！";
+            }
+
+            coins += baseReward * upgrades.multiplier.lv;
+            updateUI();
+        });
+
+        function getRandomSymbol() {
+            // Luckレベルが高いと配列の後ろ（レア要素）が出やすくなる
+            const luckBonus = upgrades.luck.lv - 1;
+            const rand = Math.random();
+            if (rand < 0.35 - (luckBonus * 0.05)) return "🍒";
+            if (rand < 0.65 - (luckBonus * 0.05)) return "🍋";
+            if (rand < 0.85) return "🍇";
+            if (rand < 0.95) return "🔔";
+            return "💎";
+        }
+
+        // --- アップグレード処理 ---
+        document.getElementById('upMultiplierBtn').addEventListener('click', () => {
+            if (coins >= upgrades.multiplier.cost) {
+                coins -= upgrades.multiplier.cost;
+                upgrades.multiplier.lv++;
+                upgrades.multiplier.cost = Math.floor(upgrades.multiplier.cost * 1.8);
+                updateUI();
+            }
+        });
+
+        document.getElementById('upLuckBtn').addEventListener('click', () => {
+            if (coins >= upgrades.luck.cost) {
+                coins -= upgrades.luck.cost;
+                upgrades.luck.lv++;
+                upgrades.luck.cost = Math.floor(upgrades.luck.cost * 1.8);
+                updateUI();
+            }
+        });
+
+        document.getElementById('upRefundBtn').addEventListener('click', () => {
+            if (coins >= upgrades.refund.cost && upgrades.refund.lv < 5) {
+                coins -= upgrades.refund.cost;
+                upgrades.refund.lv++;
+                upgrades.refund.cost = Math.floor(upgrades.refund.cost * 2.2);
+                updateUI();
+            }
+        });
+
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
         }
+
+        updateUI();
     </script>
 </body>
 </html>
