@@ -305,7 +305,6 @@ function checkMissionProgress(eventData) {
         let sessionStartTime = null;
         let timerInterval = null;
         let lastPointIntervalCount = 0;
-
         let upgrades = {
             multiplier: { lv: 1, cost: 10 },
             luck: { lv: 1, cost: 15 },
@@ -313,7 +312,25 @@ function checkMissionProgress(eventData) {
             clover: { lv: 0, cost: 25 }
         };
 
-       let wakeLock = null;
+       let violationCount = 0;
+let wakeLock = null;
+
+async function requestWakeLock() {
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+        }
+    } catch (err) {
+        console.log("Wake Lock エラー:", err);
+    }
+}
+
+function releaseWakeLock() {
+    if (wakeLock !== null) {
+        wakeLock.release();
+        wakeLock = null;
+    }
+}
 
 // スリープ防止を有効化する関数
 async function requestWakeLock() {
@@ -520,15 +537,17 @@ function releaseWakeLock() {
 
         // 計測ロジック関連
         function startSession() {
-    if (isSessionActive) return;
-    isSessionActive = true;
-    requestWakeLock(); // ★画面のスリープを防止
-    // ...（既存の処理）
+            if (isSessionActive) return;
+            isSessionActive = true;
             sessionStartTime = Date.now();
-            lastPointIntervalCount = 0;
-            statusDiv.innerText = "計測中...";
+            
+            // 違反カウントのリセットとスリープ防止有効化
+            violationCount = 0;
+            requestWakeLock();
+
             timerInterval = setInterval(checkSessionProgress, 1000);
-            releaseWakeLock();
+            statusDiv.innerText = "計測中...";
+            updateUI();
         }
 
        function checkSessionProgress() {
@@ -539,39 +558,49 @@ function releaseWakeLock() {
             const seconds = String(elapsedSec % 60).padStart(2, '0');
             timerDisplay.innerText = `経過時間: ${minutes}:${seconds}`;
 
-            // 毎秒 1 PT 加算（予定値）
-            const pendingPoints = elapsedSec * 1;
-            // 600 PT（600秒 = 10分）ごとに 1枚
-            const pendingTickets = Math.floor(pendingPoints / 600);
+            // 1秒 = 1 PT、1離脱 = -50 PT
+            const earnedPoints = elapsedSec * 1;
+            const penaltyPoints = violationCount * 50;
 
-            btnStatusDiv.innerText = `集中中... 獲得予定: +${pendingPoints} PT / チケット +${pendingTickets} 枚`;
+            const estimatedFinalPoints = Math.max(0, earnedPoints - penaltyPoints);
+            const estimatedTickets = Math.floor(estimatedFinalPoints / 600);
+
+            if (violationCount > 0) {
+                btnStatusDiv.innerText = `集中中... 予定: +${earnedPoints} PT (⚠️ペナルティ: -${penaltyPoints} PT) ➔ 見込み: +${estimatedFinalPoints} PT / チケット +${estimatedTickets} 枚`;
+            } else {
+                btnStatusDiv.innerText = `集中中... 獲得予定: +${earnedPoints} PT / チケット +${estimatedTickets} 枚`;
+            }
         }
-
         function stopSession() {
             if (!isSessionActive) return;
             
             const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
 
-            // 1秒 = 1 PT
-            const earnedPoints = elapsedSec * 1;
-            // 600 PT ごとに 1 チケット
-            const earnedTickets = Math.floor(earnedPoints / 600);
+            // 一括精算ロジック
+            const rawEarnedPoints = elapsedSec * 1;
+            const penaltyPoints = violationCount * 50;
+            const finalEarnedPoints = Math.max(0, rawEarnedPoints - penaltyPoints);
+            const earnedTickets = Math.floor(finalEarnedPoints / 600);
 
             // まとめて所持数へ加算
-            points += earnedPoints;
+            points += finalEarnedPoints;
             tickets += earnedTickets;
 
             isSessionActive = false;
             clearInterval(timerInterval);
-            releaseWakeLock(); // スリープ防止解除
+            
+            // スリープ防止解除
+            releaseWakeLock();
             
             statusDiv.innerText = "計測完了！";
             timerDisplay.innerText = "経過時間: 00:00";
 
-            if (earnedPoints > 0) {
-                btnStatusDiv.innerText = `🎉 集中完了！ +${earnedPoints} PT & チケット +${earnedTickets} 枚を獲得しました！`;
+            if (violationCount > 0) {
+                btnStatusDiv.innerText = `🎉 集中完了！ 獲得: +${rawEarnedPoints} PT (⚠️離脱ペナルティ: -${penaltyPoints} PT) ➔ 合計 +${finalEarnedPoints} PT & チケット +${earnedTickets} 枚！`;
+            } else if (finalEarnedPoints > 0) {
+                btnStatusDiv.innerText = `🎉 パーフェクト集中完了！ +${finalEarnedPoints} PT & チケット +${earnedTickets} 枚を獲得！`;
             } else {
-                btnStatusDiv.innerText = `計測終了（短時間のため報酬なし）`;
+                btnStatusDiv.innerText = `計測終了（短時間またはペナルティ超過のため報酬なし）`;
             }
 
             updateUI();
@@ -892,11 +921,11 @@ function getRandomSymbol() {
             updateUI();
         });
 
-       // 計測中に別アプリやホーム画面へ移動した時のペナルティ検知
+// 画面離脱（バックグラウンド移行）の検知リスナー
 document.addEventListener('visibilitychange', () => {
     if (document.hidden && isSessionActive) {
-        applyPenalty("画面離脱ペナルティ");
-        //stopSession();
+        violationCount++;
+        console.log(`画面離脱を検知: 累計 ${violationCount} 回`);
     }
 });
        
