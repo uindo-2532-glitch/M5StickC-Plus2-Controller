@@ -300,7 +300,7 @@ function checkMissionProgress(eventData) {
 
         // アニメーション制御用フラグ
         let isSpinning = false;
-
+        let isAnimating = false; // ← これを追加
         let isSessionActive = false;
         let sessionStartTime = null;
         let timerInterval = null;
