@@ -507,7 +507,7 @@ function checkMissionProgress(eventData) {
             timerInterval = setInterval(checkSessionProgress, 1000);
         }
 
-        function checkSessionProgress() {
+       function checkSessionProgress() {
             if (!isSessionActive) return;
             const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
             
@@ -515,27 +515,43 @@ function checkMissionProgress(eventData) {
             const seconds = String(elapsedSec % 60).padStart(2, '0');
             timerDisplay.innerText = `経過時間: ${minutes}:${seconds}`;
 
-            const INTERVAL = 10;
+            // 10秒ごとに10PT & チケット1枚（必要に応じて獲得ペースを調整してください）
+            const INTERVAL = 10; 
             const currentIntervalCount = Math.floor(elapsedSec / INTERVAL);
 
-            if (currentIntervalCount > lastPointIntervalCount) {
-                const added = (currentIntervalCount - lastPointIntervalCount);
-                points += added * 10;
-                tickets += added;
-                lastPointIntervalCount = currentIntervalCount;
-                
-                updateUI();
-                saveGame();
-                btnStatusDiv.innerText = `30分達成！ +10PT & チケット+1枚獲得！`;
-            }
+            // 計測中は何PT/何枚のチケットがもらえる予定かをリアルタイム表示
+            const pendingPoints = currentIntervalCount * 10;
+            const pendingTickets = currentIntervalCount;
+
+            btnStatusDiv.innerText = `集中中... 獲得予定: +${pendingPoints} PT / チケット +${pendingTickets} 枚`;
         }
 
         function stopSession() {
             if (!isSessionActive) return;
+            
+            const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
+            const INTERVAL = 10;
+            const intervalCount = Math.floor(elapsedSec / INTERVAL);
+
+            // 獲得計算
+            const earnedPoints = intervalCount * 10;
+            const earnedTickets = intervalCount;
+
+            // まとめて加算
+            points += earnedPoints;
+            tickets += earnedTickets;
+
             isSessionActive = false;
             clearInterval(timerInterval);
-            statusDiv.innerText = "計測終了";
+            statusDiv.innerText = "計測完了！";
             timerDisplay.innerText = "経過時間: 00:00";
+
+            if (earnedPoints > 0 || earnedTickets > 0) {
+                btnStatusDiv.innerText = `🎉 集中完了！ +${earnedPoints} PT & チケット +${earnedTickets} 枚を獲得しました！`;
+            } else {
+                btnStatusDiv.innerText = `計測終了（短時間の集中だったため報酬なし）`;
+            }
+
             updateUI();
             saveGame();
         }
