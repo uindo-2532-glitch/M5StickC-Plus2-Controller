@@ -40,9 +40,18 @@
         .slot-reel {
             width: 70px; height: 70px; line-height: 70px; background: #333;
             border-radius: 8px; border: 2px solid #555;
+            position: relative;
+            overflow: hidden;
         }
 
-        /* アニメーション演出 */
+        /* スピン中のアニメーション */
+        @keyframes spinReel {
+            0% { transform: translateY(-100%); opacity: 0.5; }
+            100% { transform: translateY(100%); opacity: 0.5; }
+        }
+        .spinning { animation: spinReel 0.1s linear infinite; }
+
+        /* 大当たりアニメーション演出 */
         @keyframes jackpotFlash {
             0% { background-color: #222; }
             50% { background-color: #f1c40f; }
@@ -147,6 +156,9 @@
         let stageEarnedCoins = 0;
         let spinsLeft = 5;
 
+        // アニメーション制御用フラグ
+        let isSpinning = false;
+
         let isSessionActive = false;
         let sessionStartTime = null;
         let timerInterval = null;
@@ -194,25 +206,28 @@
         const spinBtn       = document.getElementById('spinBtn');
         const slotMsg       = document.getElementById('slotMsg');
         const slotContainer = document.getElementById('slotContainer');
+        
+        const reel1Div = document.getElementById('reel1');
+        const reel2Div = document.getElementById('reel2');
+        const reel3Div = document.getElementById('reel3');
 
         function updateUI() {
             pointDisplay.innerText = `${points} PT`;
             ticketDisplay.innerText = tickets;
             coinDisplay.innerText = coins;
 
-            // ノルマ関連表示
             document.getElementById('stageDisplay').innerText = stage;
             document.getElementById('quotaDisplay').innerText = quota;
             document.getElementById('stageCoinDisplay').innerText = stageEarnedCoins;
             document.getElementById('spinsLeftDisplay').innerText = spinsLeft;
 
-            spinBtn.disabled = tickets <= 0;
+            // スピン中はボタンを無効化
+            spinBtn.disabled = tickets <= 0 || isSpinning;
 
-            // アップグレードボタン判定
-            document.getElementById('upMultiplierBtn').disabled = coins < upgrades.multiplier.cost;
-            document.getElementById('upLuckBtn').disabled = coins < upgrades.luck.cost;
-            document.getElementById('upRefundBtn').disabled = coins < upgrades.refund.cost || upgrades.refund.lv >= 5;
-            document.getElementById('upCloverBtn').disabled = coins < upgrades.clover.cost;
+            document.getElementById('upMultiplierBtn').disabled = coins < upgrades.multiplier.cost || isSpinning;
+            document.getElementById('upLuckBtn').disabled = coins < upgrades.luck.cost || isSpinning;
+            document.getElementById('upRefundBtn').disabled = coins < upgrades.refund.cost || upgrades.refund.lv >= 5 || isSpinning;
+            document.getElementById('upCloverBtn').disabled = coins < upgrades.clover.cost || isSpinning;
 
             document.getElementById('lvMultiplier').innerText = upgrades.multiplier.lv;
             document.getElementById('costMultiplier').innerText = upgrades.multiplier.cost;
@@ -256,7 +271,7 @@
             }
         }
 
-        // BLE 接続処理
+        // BLE 接続処理関連
         connectBtn.addEventListener('click', async () => {
             try {
                 statusDiv.innerText = "デバイスを探しています...";
@@ -310,6 +325,7 @@
             else if (value === 0) stopSession();
         }
 
+        // 計測ロジック関連
         function startSession() {
             if (isSessionActive) return;
             isSessionActive = true;
@@ -359,48 +375,71 @@
             saveGame();
         }
 
-        // --- スロット処理 ---
+        // --- アニメーション付きスロット処理 ---
         spinBtn.addEventListener('click', () => {
-            if (tickets <= 0) return;
+            if (tickets <= 0 || isSpinning) return;
+
+            isSpinning = true;
+            updateUI();
 
             const isRefund = Math.random() < (upgrades.refund.lv * 0.1);
             if (!isRefund) {
                 tickets--;
-            } else {
-                slotMsg.innerText = "🔁 チケットが手元に戻った！";
             }
 
             spinsLeft--;
 
+            // アニメーション開始
+            reel1Div.classList.add('spinning');
+            reel2Div.classList.add('spinning');
+            reel3Div.classList.add('spinning');
+            slotMsg.innerText = "スピン中...";
+
+            // 結果を先に生成
             const r1 = getRandomSymbol();
             const r2 = getRandomSymbol();
             const r3 = getRandomSymbol();
 
-            document.getElementById('reel1').innerText = r1;
-            document.getElementById('reel2').innerText = r2;
-            document.getElementById('reel3').innerText = r3;
+            // リールを順番に停止させる
+            setTimeout(() => {
+                reel1Div.classList.remove('spinning');
+                reel1Div.innerText = r1;
+            }, 600);
 
+            setTimeout(() => {
+                reel2Div.classList.remove('spinning');
+                reel2Div.innerText = r2;
+            }, 1200);
+
+            setTimeout(() => {
+                reel3Div.classList.remove('spinning');
+                reel3Div.innerText = r3;
+                
+                // 全リール停止後に結果判定
+                processSpinResult(r1, r2, r3, isRefund);
+            }, 1800);
+        });
+
+        function processSpinResult(r1, r2, r3, isRefund) {
             let baseReward = 0;
 
-            // --- シナジー演出 & 配当判定 ---
-            if (r1 === r2 && r2 === r3) {
-                // 3つ揃い（コンボシナジー）
-                baseReward = (multipliers[r1] || 5) * 3;
+            if (isRefund) {
+                setTimeout(() => { alert("🔁 チケットが手元に戻った！"); }, 100);
+            }
 
+            if (r1 === r2 && r2 === r3) {
+                baseReward = (multipliers[r1] || 5) * 3;
                 if (r1 === '7️⃣') {
-                    // 777: ジャックポット演出
                     baseReward *= 2; 
                     slotMsg.innerText = `🔥 777 JACKPOT! 超大当り +${baseReward * upgrades.multiplier.lv} コイン！`;
                     triggerFlash();
                 } else if (r1 === '🍀') {
-                    // 🍀3つ: 幸運ラッシュ（追加チケット）
                     tickets += 2;
                     slotMsg.innerText = `🍀 クローバーラッシュ！ +${baseReward * upgrades.multiplier.lv} コイン & チケット+2枚！`;
                 } else {
                     slotMsg.innerText = `🎉 【${r1}】大当り！ +${baseReward * upgrades.multiplier.lv} コイン！`;
                 }
             } else if (r1 === r2 || r2 === r3 || r1 === r3) {
-                // 2つ揃い
                 const matchedSymbol = (r1 === r2 || r1 === r3) ? r1 : r2;
                 baseReward = multipliers[matchedSymbol] || 2;
                 slotMsg.innerText = `👍 リーチ賞！ +${baseReward * upgrades.multiplier.lv} コイン`;
@@ -412,14 +451,12 @@
             coins += earned;
             stageEarnedCoins += earned;
 
-            // ノルマ達成判定
+            isSpinning = false;
             checkQuota();
-
             updateUI();
             saveGame();
-        });
+        }
 
-        // 画面フラッシュ演出
         function triggerFlash() {
             slotContainer.classList.add('flash-effect');
             setTimeout(() => {
@@ -427,10 +464,8 @@
             }, 1500);
         }
 
-        // ノルマ判定処理
         function checkQuota() {
             if (stageEarnedCoins >= quota) {
-                // クリア！
                 setTimeout(() => {
                     alert(`🎉 ステージ ${stage} クリア！ ボーナスチケット+3枚獲得！`);
                     stage++;
@@ -440,9 +475,8 @@
                     tickets += 3;
                     updateUI();
                     saveGame();
-                }, 300);
+                }, 500);
             } else if (spinsLeft <= 0) {
-                // ノルマ未達成（リセット）
                 setTimeout(() => {
                     alert(`😭 ノルマ未達成... ステージ1から再挑戦です。`);
                     stage = 1;
@@ -451,7 +485,7 @@
                     spinsLeft = 5;
                     updateUI();
                     saveGame();
-                }, 300);
+                }, 500);
             }
         }
 
@@ -475,7 +509,7 @@
 
         // --- アップグレード処理 ---
         document.getElementById('upMultiplierBtn').addEventListener('click', () => {
-            if (coins >= upgrades.multiplier.cost) {
+            if (coins >= upgrades.multiplier.cost && !isSpinning) {
                 coins -= upgrades.multiplier.cost;
                 upgrades.multiplier.lv++;
                 upgrades.multiplier.cost = Math.floor(upgrades.multiplier.cost * 1.8);
@@ -485,7 +519,7 @@
         });
 
         document.getElementById('upLuckBtn').addEventListener('click', () => {
-            if (coins >= upgrades.luck.cost) {
+            if (coins >= upgrades.luck.cost && !isSpinning) {
                 coins -= upgrades.luck.cost;
                 upgrades.luck.lv++;
                 upgrades.luck.cost = Math.floor(upgrades.luck.cost * 1.8);
@@ -495,7 +529,7 @@
         });
 
         document.getElementById('upRefundBtn').addEventListener('click', () => {
-            if (coins >= upgrades.refund.cost && upgrades.refund.lv < 5) {
+            if (coins >= upgrades.refund.cost && upgrades.refund.lv < 5 && !isSpinning) {
                 coins -= upgrades.refund.cost;
                 upgrades.refund.lv++;
                 upgrades.refund.cost = Math.floor(upgrades.refund.cost * 2.2);
@@ -505,7 +539,7 @@
         });
 
         document.getElementById('upCloverBtn').addEventListener('click', () => {
-            if (coins >= upgrades.clover.cost) {
+            if (coins >= upgrades.clover.cost && !isSpinning) {
                 coins -= upgrades.clover.cost;
                 upgrades.clover.lv++;
                 weights['🍀'] += 10;
