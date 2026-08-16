@@ -111,6 +111,32 @@
         <div class="timer-val" id="timerDisplay">経過時間: 00:00</div>
     </div>
 
+    <!-- モード選択・ランキングエリア -->
+<div class="card">
+    <h3 style="margin: 0 0 10px 0;">🏆 シーズン＆ランキング</h3>
+    
+    <div style="margin-bottom: 10px;">
+        <label><b>挑戦モード: </b></label>
+        <select id="modeSelect">
+            <option value="daily">1日モード (毎日0時リセット)</option>
+            <option value="weekly">1週間モード (毎週月曜0時リセット)</option>
+        </select>
+    </div>
+
+    <div style="font-size: 13px; color: #e74c3c; margin-bottom: 10px;">
+        残り時間: <b id="seasonTimerDisplay">--:--:--</b>
+    </div>
+
+    <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
+
+    <div style="font-weight: bold; margin-bottom: 5px;">📊 過去のベスト記録 (TOP 3)</div>
+    <div id="rankingDisplay" style="font-size: 12px; text-align: left; background: #fafafa; padding: 8px; border-radius: 6px;">
+        <div>1位: ---</div>
+        <div>2位: ---</div>
+        <div>3位: ---</div>
+    </div>
+</div>
+
     <!-- ミニゲーム：ローグライクスロット -->
     <div class="card" style="border: 2px solid #f39c12;">
         <h3 style="margin: 0 0 10px 0; color: #d35400;">🎰 Focus Slot</h3>
@@ -710,6 +736,101 @@ spinBtn.addEventListener('click', () => {
             }
             updateUI();
         });
+
+        // 次のリセット時刻（00:00:00）を計算する関数
+function getNextResetTime(mode) {
+    const now = new Date();
+    if (mode === 'daily') {
+        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        return tomorrow.getTime();
+    } else {
+        // weekly: 次の月曜日の0時
+        const day = now.getDay();
+        const diff = now.getDate() + (day === 0 ? 1 : 8 - day);
+        const nextMonday = new Date(now.getFullYear(), now.getMonth(), diff);
+        return nextMonday.getTime();
+    }
+}
+
+// シーズン期限チェック処理
+function checkSeasonReset() {
+    const now = Date.now();
+    
+    // 期限が未設定の場合は初期化
+    if (!seasonEndTime) {
+        seasonEndTime = getNextResetTime(selectedMode);
+        saveGame();
+    }
+
+    // 期限切れ判定
+    if (now >= seasonEndTime) {
+        // 1. スコアをランキングに追加
+        addScoreToRanking();
+        
+        // 2. プレイヤーの進行状況をリセット
+        resetSeasonData();
+
+        // 3. 次の期限をセット
+        seasonEndTime = getNextResetTime(selectedMode);
+        saveGame();
+
+        alert("⏰ シーズン期間が終了しました！記録がランキングに登録され、リセットされました。");
+    }
+}
+
+// ランキングに記録を追加する関数
+function addScoreToRanking() {
+    const record = {
+        date: new Date().toLocaleDateString('ja-JP'),
+        points: points,
+        coins: totalEarnedCoins,
+        missions: consecutiveMissions
+    };
+
+    rankings[selectedMode].push(record);
+    
+    // 累計PTが高い順にソートしてTOP3を残す
+    rankings[selectedMode].sort((a, b) => b.points - a.points);
+    rankings[selectedMode] = rankings[selectedMode].slice(0, 3);
+}
+
+// シーズンリセット処理（各種変数を初期値に戻す）
+function resetSeasonData() {
+    points = 0;
+    tickets = 0;
+    coins = 0;
+    stage = 1;
+    spinsLeft = 5;
+    totalEarnedCoins = 0;
+    consecutiveMissions = 0;
+    
+    // スロット強化レベルのリセット
+    upgrades = {
+        multiplier: { lv: 1, cost: 10 },
+        luck: { lv: 1, cost: 15 },
+        refund: { lv: 0, cost: 20 },
+        clover: { lv: 0, cost: 25 }
+    };
+    
+    currentMission = generateMission(1);
+    updateUI();
+}
+        
     </script>
+    // --- シーズン・ランキング管理変数 ---
+let selectedMode = 'daily'; // 'daily' または 'weekly'
+let seasonEndTime = null;
+
+// シーズン内実績（リセット時にランキングに送る値）
+let totalEarnedCoins = 0;
+let consecutiveMissions = 0;
+
+// ランキングデータ構造
+let rankings = {
+    daily: [],
+    weekly: []
+};
+
+    
 </body>
 </html>
