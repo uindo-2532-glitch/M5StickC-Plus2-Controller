@@ -571,7 +571,15 @@ function releaseWakeLock() {
             const penaltyPoints = currentPenaltySec * 5; // 離脱1秒 = -5 PT
 
             const estimatedFinalPoints = Math.max(0, earnedPoints - penaltyPoints);
-            const estimatedTickets = Math.floor(estimatedFinalPoints / 600);
+            // ① ポイント獲得分（600PTにつき1枚）
+            const ptTickets = Math.floor(estimatedFinalPoints / 600);
+
+            // ② 30分（1800秒）ごとの時間ボーナス分
+            const blocks = Math.floor(elapsedSec / 1800);
+            const timeTickets = (blocks * (blocks + 1) / 2) * 5;
+
+            // ① と ② を合算
+            const estimatedTickets = ptTickets + timeTickets;
 
             if (currentPenaltySec > 0) {
                 btnStatusDiv.innerText = `集中中... 予定: +${earnedPoints} PT (⚠️離脱ペナルティ: -${penaltyPoints} PT / ${currentPenaltySec}秒) ➔ 見込み: +${estimatedFinalPoints} PT / チケット +${estimatedTickets} 枚`;
@@ -598,11 +606,19 @@ function releaseWakeLock() {
             const netPoints = rawEarnedPoints - penaltyPoints;
             
             if (netPoints >= 0) {
-                // プラスの場合はポイント＆チケット獲得
-                points += netPoints;
-                const earnedTickets = Math.floor(netPoints / 600);
-                tickets += earnedTickets;
+                // ① ポイント獲得分（600PTにつき1枚）
+                const ptTickets = Math.floor(netPoints / 600);
 
+                // ② 30分（1800秒）ごとの時間ボーナス分
+                const blocks = Math.floor(elapsedSec / 1800);
+                const timeTickets = (blocks * (blocks + 1) / 2) * 5;
+
+                // ① と ② を合算
+                earnedTickets = ptTickets + timeTickets;
+
+                points += netPoints;
+                tickets += earnedTickets;
+                
                 if (totalPenaltySeconds > 0) {
                     btnStatusDiv.innerText = `🎉 集中完了！ 獲得: +${rawEarnedPoints} PT (⚠️離脱ペナルティ: -${penaltyPoints} PT) ➔ 合計 +${netPoints} PT & チケット +${earnedTickets} 枚！`;
                 } else if (netPoints > 0) {
