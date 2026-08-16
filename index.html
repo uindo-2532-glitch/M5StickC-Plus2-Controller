@@ -539,13 +539,10 @@ function releaseWakeLock() {
             const seconds = String(elapsedSec % 60).padStart(2, '0');
             timerDisplay.innerText = `経過時間: ${minutes}:${seconds}`;
 
-            // 10秒ごとに10PT & チケット1枚（必要に応じて獲得ペースを調整してください）
-            const INTERVAL = 10; 
-            const currentIntervalCount = Math.floor(elapsedSec / INTERVAL);
-
-            // 計測中は何PT/何枚のチケットがもらえる予定かをリアルタイム表示
-            const pendingPoints = currentIntervalCount * 10;
-            const pendingTickets = currentIntervalCount;
+            // 毎秒 1 PT 加算（予定値）
+            const pendingPoints = elapsedSec * 1;
+            // 600 PT（600秒 = 10分）ごとに 1枚
+            const pendingTickets = Math.floor(pendingPoints / 600);
 
             btnStatusDiv.innerText = `集中中... 獲得予定: +${pendingPoints} PT / チケット +${pendingTickets} 枚`;
         }
@@ -554,26 +551,27 @@ function releaseWakeLock() {
             if (!isSessionActive) return;
             
             const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
-            const INTERVAL = 10;
-            const intervalCount = Math.floor(elapsedSec / INTERVAL);
 
-            // 獲得計算
-            const earnedPoints = intervalCount * 10;
-            const earnedTickets = intervalCount;
+            // 1秒 = 1 PT
+            const earnedPoints = elapsedSec * 1;
+            // 600 PT ごとに 1 チケット
+            const earnedTickets = Math.floor(earnedPoints / 600);
 
-            // まとめて加算
+            // まとめて所持数へ加算
             points += earnedPoints;
             tickets += earnedTickets;
 
             isSessionActive = false;
             clearInterval(timerInterval);
+            releaseWakeLock(); // スリープ防止解除
+            
             statusDiv.innerText = "計測完了！";
             timerDisplay.innerText = "経過時間: 00:00";
 
-            if (earnedPoints > 0 || earnedTickets > 0) {
+            if (earnedPoints > 0) {
                 btnStatusDiv.innerText = `🎉 集中完了！ +${earnedPoints} PT & チケット +${earnedTickets} 枚を獲得しました！`;
             } else {
-                btnStatusDiv.innerText = `計測終了（短時間の集中だったため報酬なし）`;
+                btnStatusDiv.innerText = `計測終了（短時間のため報酬なし）`;
             }
 
             updateUI();
@@ -581,8 +579,17 @@ function releaseWakeLock() {
         }
 
         function applyPenalty(reason) {
-            if (points > 0) points = Math.floor(points / 2);
-            btnStatusDiv.innerText = `${reason}: フォーカスPTが半減しました！`;
+            // 集中していた秒数 × 5 PT を減算
+            let penaltyAmount = 0;
+            if (sessionStartTime) {
+                const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
+                penaltyAmount = elapsedSec * 5;
+            } else {
+                penaltyAmount = 50; // 時間が不明な場合の最低ペナルティ
+            }
+
+            points = Math.max(0, points - penaltyAmount);
+            btnStatusDiv.innerText = `⚠️ ${reason}: ${penaltyAmount} PT 没収されました！`;
             updateUI();
             saveGame();
         }
