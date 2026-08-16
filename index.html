@@ -104,37 +104,14 @@
         <div class="timer-val" id="timerDisplay">経過時間: 00:00</div>
     </div>
 
-    <!-- モード選択・ランキングエリア -->
-<div class="card">
-    <h3 style="margin: 0 0 10px 0;">🏆 シーズン＆ランキング</h3>
-    
-    <div style="margin-bottom: 10px;">
-        <label><b>挑戦モード: </b></label>
-        <select id="modeSelect">
-            <option value="daily">1日モード (毎日0時リセット)</option>
-            <option value="weekly">1週間モード (毎週月曜0時リセット)</option>
-        </select>
-    </div>
-
-    <div style="font-size: 13px; color: #e74c3c; margin-bottom: 10px;">
-        残り時間: <b id="seasonTimerDisplay">--:--:--</b>
-    </div>
-
-    <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
-
-    <div style="font-weight: bold; margin-bottom: 5px;">📊 過去のベスト記録 (TOP 3)</div>
-    <div id="rankingDisplay" style="font-size: 12px; text-align: left; background: #fafafa; padding: 8px; border-radius: 6px;">
-        <div>1位: ---</div>
-        <div>2位: ---</div>
-        <div>3位: ---</div>
-    </div>
-</div>
+    <!-- 集中中ステータス表示 -->
+    <div id="btnStatus" style="font-size: 14px; margin: 10px 0; font-weight: bold; color:#333;">---</div>
 
     <!-- ミニゲーム：ローグライクスロット -->
     <div class="card" style="border: 2px solid #f39c12;">
         <h3 style="margin: 0 0 10px 0; color: #d35400;">🎰 Focus Slot</h3>
 
-       <!-- ステージ・ミッション情報 -->
+        <!-- ステージ・ミッション情報 -->
         <div class="stage-box">
             <div><b>ステージ: <span id="stageDisplay">1</span></b></div>
             <div style="margin: 4px 0; color: #d35400;">
@@ -147,11 +124,11 @@
         <div>所持チケット: <b id="ticketDisplay" style="color:#e67e22; font-size:18px;">0</b> 枚</div>
         <div>所持コイン: <b id="coinDisplay" style="color:#f1c40f; font-size:18px;">0</b> C</div>
 
-       <div class="slot-container" id="slotContainer">
-    <div class="slot-reel"><span class="reel-inner" id="reel1">❓</span></div>
-    <div class="slot-reel"><span class="reel-inner" id="reel2">❓</span></div>
-    <div class="slot-reel"><span class="reel-inner" id="reel3">❓</span></div>
-</div>
+        <div class="slot-container" id="slotContainer">
+            <div class="slot-reel"><span class="reel-inner" id="reel1">❓</span></div>
+            <div class="slot-reel"><span class="reel-inner" id="reel2">❓</span></div>
+            <div class="slot-reel"><span class="reel-inner" id="reel3">❓</span></div>
+        </div>
 
         <button class="btn-spin" id="spinBtn" disabled>スピン (1枚消費)</button>
         <div id="slotMsg" style="margin-top: 8px; font-weight: bold; min-height: 20px;"></div>
@@ -184,9 +161,103 @@
         </div>
     </div>
 
-    <div id="btnStatus" style="font-size: 14px; margin-top: 10px; color:#666;">---</div>
+    <!-- ★ 一番下に移動：モード選択・ランキングエリア -->
+    <div class="card">
+        <h3 style="margin: 0 0 10px 0;">🏆 シーズン＆ランキング</h3>
+        
+        <div style="margin-bottom: 10px;">
+            <label><b>挑戦モード: </b></label>
+            <select id="modeSelect">
+                <option value="daily">1日モード (毎日0時リセット)</option>
+                <option value="weekly">1週間モード (毎週月曜0時リセット)</option>
+            </select>
+        </div>
 
+        <div style="font-size: 13px; color: #e74c3c; margin-bottom: 10px;">
+            残り時間: <b id="seasonTimerDisplay">--:--:--</b>
+        </div>
+
+        <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
+
+        <div style="font-weight: bold; margin-bottom: 5px;">📊 過去のベスト記録 (TOP 3)</div>
+        <div id="rankingDisplay" style="font-size: 12px; text-align: left; background: #fafafa; padding: 8px; border-radius: 6px;">
+            <div>1位: ---</div>
+            <div>2位: ---</div>
+            <div>3位: ---</div>
+        </div>
+    </div>
+    
    <script>
+       // Web Audio APIの初期化
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+// 効果音発生関数
+function playSE(type) {
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    const now = audioCtx.currentTime;
+
+    if (type === 'start') {
+        // 計測開始音（上昇ピポッ）
+        osc.frequency.setValueAtTime(440, now); // A4
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
+    } else if (type === 'complete') {
+        // 完了音（ファンファーレ風）
+        osc.frequency.setValueAtTime(523.25, now); // C5
+        osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+        osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+        osc.frequency.setValueAtTime(1046.50, now + 0.3); // C6
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+        osc.start(now);
+        osc.stop(now + 0.6);
+    } else if (type === 'penalty') {
+        // ペナルティ・没収音（重いブザー）
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, now);
+        osc.frequency.linearRampToValueAtTime(80, now + 0.3);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+    } else if (type === 'spin') {
+        // スロット回転音（チッ）
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(800, now);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+        osc.start(now);
+        osc.stop(now + 0.05);
+    } else if (type === 'win') {
+        // 当たり音（ピロリン）
+        osc.frequency.setValueAtTime(587.33, now); // D5
+        osc.frequency.setValueAtTime(880, now + 0.1); // A5
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
+    } else if (type === 'upgrade') {
+        // 強化音（シャキーン）
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(1200, now + 0.2);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.start(now);
+        osc.stop(now + 0.2);
+    }
+}
         // --- シーズン・ランキング管理変数 ---
         let selectedMode = 'daily'; // 'daily' または 'weekly'
         let seasonEndTime = null;
@@ -542,6 +613,7 @@ function releaseWakeLock() {
             if (isSessionActive) return;
             isSessionActive = true;
             sessionStartTime = Date.now();
+            playSE('start');
             
             // 違反カウントのリセットとスリープ防止有効化
             violationCount = 0;
@@ -597,6 +669,14 @@ function releaseWakeLock() {
             }
 
             const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
+
+            if (netPoints >= 0) {
+        // プラスで終了した場合
+        playSE('complete'); // ★完了音
+    } else {
+        // マイナスで没収された場合
+        playSE('penalty'); // ★ペナルティ音
+    }
 
             // 1秒 = +1 PT / 離脱1秒 = -5 PT
             const rawEarnedPoints = elapsedSec * 1;
@@ -675,6 +755,10 @@ spinBtn.addEventListener('click', () => {
 
     spinsLeft--;
 
+    playSE('spin'); // ★スピン開始音
+    // ...
+});
+       
     // 枠の中の文字（.reel-inner）にアニメーションを付与
     reel1Div.classList.add('spinning');
     reel2Div.classList.add('spinning');
@@ -708,6 +792,11 @@ spinBtn.addEventListener('click', () => {
 
         function processSpinResult(r1, r2, r3, isRefund) {
             let baseReward = 0;
+
+            // 当たり判定時（揃った時）
+if (isWin) {
+    playSE('win'); // ★当たり音
+}
 
             if (isRefund) {
                 setTimeout(() => { alert("🔁 チケットが手元に戻った！"); }, 100);
@@ -790,6 +879,7 @@ spinBtn.addEventListener('click', () => {
                 coins -= upgrades.multiplier.cost;
                 upgrades.multiplier.lv++;
                 upgrades.multiplier.cost = Math.floor(upgrades.multiplier.cost * 1.8);
+                playSE('upgrade'); // ★強化音
                 checkMissionProgress({ type: 'upgrade' });
                 checkQuota();
                 updateUI();
