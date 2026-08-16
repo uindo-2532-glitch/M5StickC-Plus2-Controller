@@ -365,65 +365,7 @@ let weights = {
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
         }
-        // セーブ処理
-        function saveGame() {
-        const saveData = {
-        coins: coins,
-        spins: spins,
-        curseCount: curseCount,
-        weights: weights,
-        inventory: inventory
-          };
-          localStorage.setItem('rogueSlotSave', JSON.stringify(saveData));
-          console.log("ゲームを保存しました");
-        }
 
-        // ロード処理
-        function loadGame() {
-        const saved = localStorage.getItem('rogueSlotSave');
-        if (saved) {
-          const saveData = JSON.parse(saved);
-          coins = saveData.coins;
-          spins = saveData.spins;
-          curseCount = saveData.curseCount;
-          weights = saveData.weights;
-          inventory = saveData.inventory || [];
-          updateUI();
-          console.log("データを読み込みました");
-        }
-    }
-
-// ページ読み込み時に自動ロードを実行したい場合は末尾に追加
-window.addEventListener('load', () => {
-    loadGame();
-});
-const shopItems = [
-    // 既存のアイテム...
-    
-    // 新規アイテム例
-    {
-        id: 'clover_charm',
-        name: '幸運のクローバー',
-        cost: 30,
-        description: '🍀の出現率がアップし、全体配当がわずかに上昇',
-        effect: () => {
-            weights['🍀'] += 15;
-            // 全体倍率補正などの処理
-        }
-    },
-    {
-        id: 'purify_scroll',
-        name: '浄化のスクロール',
-        cost: 50,
-        description: '呪いカウント（💀の確率）を少し下げる',
-        effect: () => {
-            if (curseCount > 0) {
-                curseCount--;
-                weights['💀'] = Math.max(1, weights['💀'] - 5);
-            }
-        }
-    }
-];
         updateUI();
     </script>
 </body>
