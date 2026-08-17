@@ -613,10 +613,10 @@ function releaseWakeLock() {
             if (isSessionActive) return;
             isSessionActive = true;
             sessionStartTime = Date.now();
+            totalPenaltySeconds = 0; // ペナルティ秒数を初期化
             playSE('start');
             
-            // 違反カウントのリセットとスリープ防止有効化
-            violationCount = 0;
+            // スリープ防止有効化
             requestWakeLock();
             leaveTime = null;
 
@@ -625,7 +625,7 @@ function releaseWakeLock() {
             updateUI();
         }
 
-       function checkSessionProgress() {
+        function checkSessionProgress() {
             if (!isSessionActive) return;
             const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
             
@@ -659,6 +659,7 @@ function releaseWakeLock() {
                 btnStatusDiv.innerText = `集中中... 獲得予定: +${earnedPoints} PT / チケット +${estimatedTickets} 枚`;
             }
         }
+
         function stopSession() {
             if (!isSessionActive) return;
             
@@ -670,21 +671,24 @@ function releaseWakeLock() {
 
             const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
 
-            if (netPoints >= 0) {
-        // プラスで終了した場合
-        playSE('complete'); // ★完了音
-    } else {
-        // マイナスで没収された場合
-        playSE('penalty'); // ★ペナルティ音
-    }
-
             // 1秒 = +1 PT / 離脱1秒 = -5 PT
             const rawEarnedPoints = elapsedSec * 1;
             const penaltyPoints = totalPenaltySeconds * 5;
             
             // 収支計算（マイナスの場合は既存ポイントからの没収額になる）
             const netPoints = rawEarnedPoints - penaltyPoints;
-            
+
+            // SE再生の判定（計算後に実行）
+            if (netPoints >= 0) {
+                // プラスで終了した場合
+                playSE('complete'); // ★完了音
+            } else {
+                // マイナスで没収された場合
+                playSE('penalty'); // ★ペナルティ音
+            }
+
+            let earnedTickets = 0;
+
             if (netPoints >= 0) {
                 // ① ポイント獲得分（600PTにつき1枚）
                 const ptTickets = Math.floor(netPoints / 600);
