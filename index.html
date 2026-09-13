@@ -383,33 +383,15 @@ function checkMissionProgress(eventData) {
             clover: { lv: 0, cost: 25 }
         };
 
-       // 画面離脱時間の管理用変数
-let totalPenaltySeconds = 0; // 累積の離脱秒数
-let leaveTime = null;         // 画面を離れた時刻
+// スリープ防止用変数
 let wakeLock = null;
-
-async function requestWakeLock() {
-    try {
-        if ('wakeLock' in navigator) {
-            wakeLock = await navigator.wakeLock.request('screen');
-        }
-    } catch (err) {
-        console.log("Wake Lock エラー:", err);
-    }
-}
-
-function releaseWakeLock() {
-    if (wakeLock !== null) {
-        wakeLock.release();
-        wakeLock = null;
-    }
-}
 
 // スリープ防止を有効化する関数
 async function requestWakeLock() {
     try {
         if ('wakeLock' in navigator) {
             wakeLock = await navigator.wakeLock.request('screen');
+            console.log("Wake Lock 有効化成功");
         }
     } catch (err) {
         console.log("Wake Lock エラー:", err);
@@ -419,8 +401,10 @@ async function requestWakeLock() {
 // スリープ防止を解除する関数
 function releaseWakeLock() {
     if (wakeLock !== null) {
-        wakeLock.release();
-        wakeLock = null;
+        wakeLock.release().then(() => {
+            wakeLock = null;
+            console.log("Wake Lock 解除成功");
+        });
     }
 }
 
@@ -1052,23 +1036,28 @@ function getRandomSymbol() {
             updateUI();
         });
 
-// 画面離脱・復帰の時刻を記録して離脱秒数を集計
-        document.addEventListener('visibilitychange', () => {
-            if (!isSessionActive) return;
+// 画面離脱・復帰の時刻を記録して離脱秒数を集計 & スリープ防止の再取得
+document.addEventListener('visibilitychange', async () => {
+    if (!isSessionActive) return;
 
-            if (document.hidden) {
-                // アプリから離れた時刻を記憶
-                leaveTime = Date.now();
-            } else {
-                // アプリに戻った時に離脱秒数を加算
-                if (leaveTime) {
-                    const awaySec = Math.floor((Date.now() - leaveTime) / 1000);
-                    totalPenaltySeconds += awaySec;
-                    leaveTime = null;
-                    console.log(`離脱検知: ${awaySec}秒間離脱 (累計: ${totalPenaltySeconds}秒)`);
-                }
-            }
-        });
+    if (document.hidden) {
+        // アプリから離れた時刻を記憶
+        leaveTime = Date.now();
+    } else {
+        // アプリに戻った時に離脱秒数を加算
+        if (leaveTime) {
+            const awaySec = Math.floor((Date.now() - leaveTime) / 1000);
+            totalPenaltySeconds += awaySec;
+            leaveTime = null;
+            console.log(`離脱検知: ${awaySec}秒間離脱 (累計: ${totalPenaltySeconds}秒)`);
+        }
+        
+        // ★重要: タブやアプリに戻った際、計測中であればスリープ防止を再要求する
+        if (wakeLock === null) {
+            await requestWakeLock();
+        }
+    }
+});
        
     </script>
 </body>
