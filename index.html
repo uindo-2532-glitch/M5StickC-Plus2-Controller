@@ -97,6 +97,21 @@
 
     <div id="status">ステータス: 未接続</div>
 
+    <!-- ⚙️ ボーナス時間帯設定 -->
+    <div class="card" style="border: 1px solid #17a2b8;">
+        <h3 style="margin: 0 0 10px 0; color: #17a2b8;">⚙️ 集中強化タイム設定</h3>
+        <div style="font-size: 13px; color: #555; margin-bottom: 8px;">
+            スマホを触りがちな時間帯を設定すると、その時間の集中ポイントが<b>2.0倍</b>になります！
+        </div>
+        <div style="display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 14px;">
+            <label>指定時間: </label>
+            <select id="bonusStartHour" style="padding: 4px; border-radius: 4px;"></select> 時
+            <span>〜</span>
+            <select id="bonusEndHour" style="padding: 4px; border-radius: 4px;"></select> 時
+        </div>
+        <div id="bonusStatusMsg" style="font-size: 12px; margin-top: 8px; color: #e67e22; font-weight: bold;"></div>
+    </div>
+
     <!-- メイン実績＆タイマー -->
     <div class="card">
         <div style="font-size:12px; color:#888;">累計フォーカス実績</div>
@@ -396,7 +411,9 @@ function checkMissionProgress(eventData) {
             clover: { lv: 0, cost: 25 }
         };
 
-// スリープ防止用変数
+// 画面離脱時間の管理用変数
+let totalPenaltySeconds = 0; // 累積の離脱秒数
+let leaveTime = null;         // 画面を離れた時刻
 let wakeLock = null;
 
 // スリープ防止を有効化する関数
@@ -404,7 +421,6 @@ async function requestWakeLock() {
     try {
         if ('wakeLock' in navigator) {
             wakeLock = await navigator.wakeLock.request('screen');
-            console.log("Wake Lock 有効化成功");
         }
     } catch (err) {
         console.log("Wake Lock エラー:", err);
@@ -416,11 +432,48 @@ function releaseWakeLock() {
     if (wakeLock !== null) {
         wakeLock.release().then(() => {
             wakeLock = null;
-            console.log("Wake Lock 解除成功");
         });
     }
 }
 
+// --- ターゲット時間帯＆ボーナス設定用変数 ---
+        let bonusStartHour = 21; // デフォルト: 21時
+        let bonusEndHour = 23;   // デフォルト: 23時
+
+        // 倍率を計算する関数
+        function getPointMultiplier() {
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentDay = now.getDay(); // 0: 日曜, 6: 土曜
+
+            let multiplier = 1.0;
+            let reasons = [];
+
+            // 1. ターゲット時間帯チェック
+            let isBonusHour = false;
+            if (bonusStartHour < bonusEndHour) {
+                isBonusHour = (currentHour >= bonusStartHour && currentHour < bonusEndHour);
+            } else if (bonusStartHour > bonusEndHour) {
+                isBonusHour = (currentHour >= bonusStartHour || currentHour < bonusEndHour);
+            }
+
+            if (isBonusHour) {
+                multiplier *= 2.0;
+                reasons.push("ターゲット時間帯(2.0倍)");
+            }
+
+            // 2. 曜日ボーナス（土日）チェック
+            if (currentDay === 0 || currentDay === 6) {
+                multiplier *= 1.5;
+                reasons.push("週末ボーナス(1.5倍)");
+            }
+
+            return {
+                value: multiplier,
+                text: reasons.length > 0 ? reasons.join(" + ") : "通常倍率(1.0倍)"
+            };
+        }
+       
         const symbols = ['🍒', '🔔', '🍋', '7️⃣', '💀', '💎', '🍀'];
         const multipliers = {
             '🍒': 2,
@@ -520,14 +573,13 @@ function releaseWakeLock() {
                 currentMission: currentMission,
                 upgrades: upgrades,
                 weights: weights,
-                bonusStartHour: bonusStartHour,
-                bonusEndHour: bonusEndHour,
                 selectedMode: selectedMode,
                 seasonEndTime: seasonEndTime,
                 totalEarnedCoins: totalEarnedCoins,
                 consecutiveMissions: consecutiveMissions,
-                rankings: rankings
-                
+                rankings: rankings,
+                bonusStartHour: bonusStartHour,
+                bonusEndHour: bonusEndHour
             };
             localStorage.setItem('m5FocusSlotSave', JSON.stringify(saveData));
         }
@@ -544,17 +596,17 @@ function releaseWakeLock() {
                 if (saveData.currentMission) currentMission = saveData.currentMission;
                 if (saveData.upgrades) upgrades = Object.assign(upgrades, saveData.upgrades);
                 if (saveData.weights) weights = Object.assign(weights, saveData.weights);
-                if (saveData.bonusStartHour !== undefined) bonusStartHour = saveData.bonusStartHour;
-                if (saveData.bonusEndHour !== undefined) bonusEndHour = saveData.bonusEndHour;
+                
                 if (saveData.selectedMode) selectedMode = saveData.selectedMode;
                 if (saveData.seasonEndTime) seasonEndTime = saveData.seasonEndTime;
                 totalEarnedCoins = saveData.totalEarnedCoins || 0;
                 consecutiveMissions = saveData.consecutiveMissions || 0;
                 if (saveData.rankings) rankings = saveData.rankings;
+                if (saveData.bonusStartHour !== undefined) bonusStartHour = saveData.bonusStartHour;
+                if (saveData.bonusEndHour !== undefined) bonusEndHour = saveData.bonusEndHour;
                 updateUI();
             }
         }
-
         // BLE 接続処理関連
         connectBtn.addEventListener('click', async () => {
             try {
@@ -655,6 +707,17 @@ function releaseWakeLock() {
             // ① と ② を合算
             const estimatedTickets = ptTickets + timeTickets;
 
+            // 倍率計算の適用
+            const mult = getPointMultiplier();
+            const earnedPoints = Math.floor(elapsedSec * 1 * mult.value);
+            const penaltyPoints = currentPenaltySec * 5;
+
+            const estimatedFinalPoints = Math.max(0, earnedPoints - penaltyPoints);
+            const ptTickets = Math.floor(estimatedFinalPoints / 600);
+            const blocks = Math.floor(elapsedSec / 1800);
+            const timeTickets = (blocks * (blocks + 1) / 2) * 5;
+            const estimatedTickets = ptTickets + timeTickets;
+
             if (currentPenaltySec > 0) {
                 btnStatusDiv.innerText = `集中中... 予定: +${earnedPoints} PT (⚠️離脱ペナルティ: -${penaltyPoints} PT / ${currentPenaltySec}秒) ➔ 見込み: +${estimatedFinalPoints} PT / チケット +${estimatedTickets} 枚`;
             } else {
@@ -705,6 +768,13 @@ function releaseWakeLock() {
 
                 points += netPoints;
                 tickets += earnedTickets;
+
+                // 倍率計算の適用
+            const mult = getPointMultiplier();
+            const rawEarnedPoints = Math.floor(elapsedSec * 1 * mult.value);
+            const penaltyPoints = totalPenaltySeconds * 5;
+            
+            const netPoints = rawEarnedPoints - penaltyPoints;
                 
                 if (totalPenaltySeconds > 0) {
                     btnStatusDiv.innerText = `🎉 集中完了！ 獲得: +${rawEarnedPoints} PT (⚠️離脱ペナルティ: -${penaltyPoints} PT) ➔ 合計 +${netPoints} PT & チケット +${earnedTickets} 枚！`;
@@ -1046,10 +1116,46 @@ function getRandomSymbol() {
             navigator.serviceWorker.register('sw.js');
         }
 
-        // ページ読み込み時の処理
+       // ターゲット時間帯セレクトボックスの初期化関数
+        function initBonusTimeSelects() {
+            const startSelect = document.getElementById('bonusStartHour');
+            const endSelect = document.getElementById('bonusEndHour');
+
+            if (!startSelect || !endSelect) return;
+
+            startSelect.innerHTML = '';
+            endSelect.innerHTML = '';
+
+            for (let i = 0; i < 24; i++) {
+                const optStart = document.createElement('option');
+                optStart.value = i;
+                optStart.textContent = `${String(i).padStart(2, '0')}:00`;
+                if (i === bonusStartHour) optStart.selected = true;
+                startSelect.appendChild(optStart);
+
+                const optEnd = document.createElement('option');
+                optEnd.value = i;
+                optEnd.textContent = `${String(i).padStart(2, '0')}:00`;
+                if (i === bonusEndHour) optEnd.selected = true;
+                endSelect.appendChild(optEnd);
+            }
+
+            startSelect.addEventListener('change', (e) => {
+                bonusStartHour = parseInt(e.target.value);
+                saveGame();
+                updateUI();
+            });
+
+            endSelect.addEventListener('change', (e) => {
+                bonusEndHour = parseInt(e.target.value);
+                saveGame();
+                updateUI();
+            });
+        }
+
         window.addEventListener('load', () => {
             loadGame();
-            initBonusTimeSelects(); // ★追加co
+            initBonusTimeSelects(); // セレクトボックス作成
             if (!currentMission || !currentMission.text) {
                 currentMission = generateMission(stage);
             }
