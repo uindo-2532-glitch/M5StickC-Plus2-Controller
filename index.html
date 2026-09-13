@@ -520,11 +520,10 @@ function releaseWakeLock() {
             coinDisplay.innerText = coins;
 
             document.getElementById('stageDisplay').innerText = stage;
-            document.getElementById('missionTextDisplay').innerText = currentMission.text;
-            document.getElementById('missionProgressDisplay').innerText = `${currentMission.currentVal} / ${currentMission.targetVal}`;
+            document.getElementById('missionTextDisplay').innerText = currentMission ? currentMission.text : "---";
+            document.getElementById('missionProgressDisplay').innerText = currentMission ? `${currentMission.currentVal} / ${currentMission.targetVal}` : "0 / 0";
             document.getElementById('spinsLeftDisplay').innerText = spinsLeft;
 
-            // スピン中はボタンを無効化
             spinBtn.disabled = tickets <= 0 || isSpinning;
 
             document.getElementById('upMultiplierBtn').disabled = coins < upgrades.multiplier.cost || isSpinning;
@@ -541,7 +540,6 @@ function releaseWakeLock() {
             document.getElementById('lvClover').innerText = upgrades.clover.lv;
             document.getElementById('costClover').innerText = upgrades.costClover || upgrades.clover.cost;
 
-            // ★以下を updateUI() の一番下に追加
             document.getElementById('modeSelect').value = selectedMode;
 
             if (seasonEndTime) {
@@ -562,13 +560,14 @@ function releaseWakeLock() {
                 });
             }
             document.getElementById('rankingDisplay').innerHTML = rankingHtml;
-        }
-       // ★追加入力
+
             const bonusMsgDiv = document.getElementById('bonusStatusMsg');
             if (bonusMsgDiv) {
                 const mult = getPointMultiplier();
                 bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
             }
+        }
+       
       function saveGame() {
             const saveData = {
                 points: points,
@@ -1106,7 +1105,7 @@ function getRandomSymbol() {
             navigator.serviceWorker.register('sw.js');
         }
 
-      // ターゲット時間帯セレクトボックスの初期化関数
+     // ターゲット時間帯セレクトボックスの初期化関数
         function initBonusTimeSelects() {
             const startSelect = document.getElementById('bonusStartHour');
             const endSelect = document.getElementById('bonusEndHour');
@@ -1145,22 +1144,13 @@ function getRandomSymbol() {
 
         window.addEventListener('load', () => {
             loadGame();
-            initBonusTimeSelects(); // セレクトボックス作成
+            initBonusTimeSelects();
             if (!currentMission || !currentMission.text) {
                 currentMission = generateMission(stage);
             }
             updateUI();
         });
 
-       // ターゲット時間帯ステータス表示更新
-            const bonusMsgDiv = document.getElementById('bonusStatusMsg');
-            if (bonusMsgDiv) {
-                const mult = getPointMultiplier();
-                bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
-            }
-        }
-
-// 画面復帰時の「スリープ防止再要求」と離脱集計
         document.addEventListener('visibilitychange', async () => {
             if (!isSessionActive) return;
 
@@ -1174,13 +1164,11 @@ function getRandomSymbol() {
                     console.log(`離脱検知: ${awaySec}秒間離脱 (累計: ${totalPenaltySeconds}秒)`);
                 }
 
-                // スリープ防止機能の再要求
                 if (wakeLock === null) {
                     await requestWakeLock();
                 }
             }
         });
-       
     </script>
 </body>
 </html>
