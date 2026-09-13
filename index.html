@@ -88,7 +88,7 @@
 </head>
 <body>
 
-    <h2>M5StickCPlus2 Focus Tracker</h2>
+    <h2>M5StickC Focus Tracker</h2>
 
     <button class="btn-connect" id="connectBtn">M5Stackに接続</button>
     <br>
@@ -111,7 +111,7 @@
         </div>
         <div id="bonusStatusMsg" style="font-size: 12px; margin-top: 8px; color: #e67e22; font-weight: bold;"></div>
     </div>
-    
+
     <!-- メイン実績＆タイマー -->
     <div class="card">
         <div style="font-size:12px; color:#888;">累計フォーカス実績</div>
@@ -175,7 +175,20 @@
             </div>
         </div>
     </div>
-    
+<!-- ⚙️ ボーナス時間帯設定 -->
+    <div class="card" style="border: 1px solid #17a2b8;">
+        <h3 style="margin: 0 0 10px 0; color: #17a2b8;">⚙️ 集中強化タイム設定</h3>
+        <div style="font-size: 13px; color: #555; margin-bottom: 8px;">
+            スマホを触りがちな時間帯を設定すると、その時間の集中ポイントが<b>2.0倍</b>になります！
+        </div>
+        <div style="display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 14px;">
+            <label>指定時間: </label>
+            <select id="bonusStartHour" style="padding: 4px; border-radius: 4px;"></select> 時
+            <span>〜</span>
+            <select id="bonusEndHour" style="padding: 4px; border-radius: 4px;"></select> 時
+        </div>
+        <div id="bonusStatusMsg" style="font-size: 12px; margin-top: 8px; color: #e67e22; font-weight: bold;"></div>
+    </div>
     <!-- ★ 一番下に移動：モード選択・ランキングエリア -->
     <div class="card">
         <h3 style="margin: 0 0 10px 0;">🏆 シーズン＆ランキング</h3>
@@ -287,9 +300,6 @@ function playSE(type) {
             weekly: []
         };
 
-       let bluetoothDevice = null;
-        let dataCharacteristic = null;
-       
         const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
         const CHARACTERISTIC_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
 
@@ -510,10 +520,11 @@ function releaseWakeLock() {
             coinDisplay.innerText = coins;
 
             document.getElementById('stageDisplay').innerText = stage;
-            document.getElementById('missionTextDisplay').innerText = currentMission ? currentMission.text : "---";
-            document.getElementById('missionProgressDisplay').innerText = currentMission ? `${currentMission.currentVal} / ${currentMission.targetVal}` : "0 / 0";
+            document.getElementById('missionTextDisplay').innerText = currentMission.text;
+            document.getElementById('missionProgressDisplay').innerText = `${currentMission.currentVal} / ${currentMission.targetVal}`;
             document.getElementById('spinsLeftDisplay').innerText = spinsLeft;
 
+            // スピン中はボタンを無効化
             spinBtn.disabled = tickets <= 0 || isSpinning;
 
             document.getElementById('upMultiplierBtn').disabled = coins < upgrades.multiplier.cost || isSpinning;
@@ -530,6 +541,7 @@ function releaseWakeLock() {
             document.getElementById('lvClover').innerText = upgrades.clover.lv;
             document.getElementById('costClover').innerText = upgrades.costClover || upgrades.clover.cost;
 
+            // ★以下を updateUI() の一番下に追加
             document.getElementById('modeSelect').value = selectedMode;
 
             if (seasonEndTime) {
@@ -549,16 +561,9 @@ function releaseWakeLock() {
                     rankingHtml += `<div><b>${index + 1}位</b> (${item.date}): ${item.points} PT / ${item.coins} C / 連続${item.missions}回</div>`;
                 });
             }
-          document.getElementById('rankingDisplay').innerHTML = rankingHtml;
-
-            const bonusMsgDiv = document.getElementById('bonusStatusMsg');
-            if (bonusMsgDiv) {
-                const mult = getPointMultiplier();
-                bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
-            }
-        } // ← updateUI はここで閉じる
-
-        function saveGame() {
+            document.getElementById('rankingDisplay').innerHTML = rankingHtml;
+        }
+      function saveGame() {
             const saveData = {
                 points: points,
                 tickets: tickets,
@@ -687,7 +692,22 @@ function releaseWakeLock() {
                 currentPenaltySec += Math.floor((Date.now() - leaveTime) / 1000);
             }
 
-        // 倍率計算の適用
+            const mult = getPointMultiplier();
+            const earnedPoints = Math.floor(elapsedSec * 1 * mult.value); // 倍率適用
+            const penaltyPoints = currentPenaltySec * 5; // 離脱1秒 = -5 PT
+
+            const estimatedFinalPoints = Math.max(0, earnedPoints - penaltyPoints);
+            // ① ポイント獲得分（600PTにつき1枚）
+            const ptTickets = Math.floor(estimatedFinalPoints / 600);
+
+            // ② 30分（1800秒）ごとの時間ボーナス分
+            const blocks = Math.floor(elapsedSec / 1800);
+            const timeTickets = (blocks * (blocks + 1) / 2) * 5;
+
+            // ① と ② を合算
+            const estimatedTickets = ptTickets + timeTickets;
+
+            // 倍率計算の適用
             const mult = getPointMultiplier();
             const earnedPoints = Math.floor(elapsedSec * 1 * mult.value);
             const penaltyPoints = currentPenaltySec * 5;
@@ -699,11 +719,12 @@ function releaseWakeLock() {
             const estimatedTickets = ptTickets + timeTickets;
 
             if (currentPenaltySec > 0) {
-                btnStatusDiv.innerText = `集中中... 予定: +${earnedPoints} PT [${mult.text}] (⚠️離脱ペナルティ: -${penaltyPoints} PT / ${currentPenaltySec}秒) ➔ 見込み: +${estimatedFinalPoints} PT / チケット +${estimatedTickets} 枚`;
+                btnStatusDiv.innerText = `集中中... 予定: +${earnedPoints} PT (⚠️離脱ペナルティ: -${penaltyPoints} PT / ${currentPenaltySec}秒) ➔ 見込み: +${estimatedFinalPoints} PT / チケット +${estimatedTickets} 枚`;
             } else {
-                btnStatusDiv.innerText = `集中中... 獲得予定: +${earnedPoints} PT [${mult.text}] / チケット +${estimatedTickets} 枚`;
+                btnStatusDiv.innerText = `集中中... 獲得予定: +${earnedPoints} PT / チケット +${estimatedTickets} 枚`;
             }
-            
+        }
+
         function stopSession() {
             if (!isSessionActive) return;
             
@@ -713,11 +734,11 @@ function releaseWakeLock() {
                 leaveTime = null;
             }
 
-           const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
+            const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
 
-            // 倍率計算の適用
+            // 1秒 = +1 PT / 離脱1秒 = -5 PT
             const mult = getPointMultiplier();
-            const rawEarnedPoints = Math.floor(elapsedSec * 1 * mult.value);
+            const rawEarnedPoints = Math.floor(elapsedSec * 1 * mult.value); // 倍率適用
             const penaltyPoints = totalPenaltySeconds * 5;
             
             // 収支計算（マイナスの場合は既存ポイントからの没収額になる）
@@ -1091,11 +1112,11 @@ function getRandomSymbol() {
             updateUI();
         }, 1000);
 
-if ('serviceWorker' in navigator) {
+        if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
         }
 
-        // ターゲット時間帯セレクトボックスの初期化関数
+       // ターゲット時間帯セレクトボックスの初期化関数
         function initBonusTimeSelects() {
             const startSelect = document.getElementById('bonusStartHour');
             const endSelect = document.getElementById('bonusEndHour');
@@ -1134,31 +1155,44 @@ if ('serviceWorker' in navigator) {
 
         window.addEventListener('load', () => {
             loadGame();
-            initBonusTimeSelects();
+            initBonusTimeSelects(); // セレクトボックス作成
             if (!currentMission || !currentMission.text) {
                 currentMission = generateMission(stage);
             }
             updateUI();
         });
 
-        document.addEventListener('visibilitychange', async () => {
-            if (!isSessionActive) return;
-
-            if (document.hidden) {
-                leaveTime = Date.now();
-            } else {
-                if (leaveTime) {
-                    const awaySec = Math.floor((Date.now() - leaveTime) / 1000);
-                    totalPenaltySeconds += awaySec;
-                    leaveTime = null;
-                    console.log(`離脱検知: ${awaySec}秒間離脱 (累計: ${totalPenaltySeconds}秒)`);
-                }
-
-                if (wakeLock === null) {
-                    await requestWakeLock();
-                }
+       // ターゲット時間帯ステータス表示更新
+            const bonusMsgDiv = document.getElementById('bonusStatusMsg');
+            if (bonusMsgDiv) {
+                const mult = getPointMultiplier();
+                bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
             }
-        });
+        }
+
+// 画面離脱・復帰の時刻を記録して離脱秒数を集計 & スリープ防止の再取得
+document.addEventListener('visibilitychange', async () => {
+    if (!isSessionActive) return;
+
+    if (document.hidden) {
+        // アプリから離れた時刻を記憶
+        leaveTime = Date.now();
+    } else {
+        // アプリに戻った時に離脱秒数を加算
+        if (leaveTime) {
+            const awaySec = Math.floor((Date.now() - leaveTime) / 1000);
+            totalPenaltySeconds += awaySec;
+            leaveTime = null;
+            console.log(`離脱検知: ${awaySec}秒間離脱 (累計: ${totalPenaltySeconds}秒)`);
+        }
+        
+        // ★重要: タブやアプリに戻った際、計測中であればスリープ防止を再要求する
+        if (wakeLock === null) {
+            await requestWakeLock();
+        }
+    }
+});
+       
     </script>
 </body>
 </html>
