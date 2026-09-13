@@ -111,7 +111,7 @@
         </div>
         <div id="bonusStatusMsg" style="font-size: 12px; margin-top: 8px; color: #e67e22; font-weight: bold;"></div>
     </div>
-
+    
     <!-- メイン実績＆タイマー -->
     <div class="card">
         <div style="font-size:12px; color:#888;">累計フォーカス実績</div>
@@ -563,6 +563,12 @@ function releaseWakeLock() {
             }
             document.getElementById('rankingDisplay').innerHTML = rankingHtml;
         }
+       // ★追加入力
+            const bonusMsgDiv = document.getElementById('bonusStatusMsg');
+            if (bonusMsgDiv) {
+                const mult = getPointMultiplier();
+                bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
+            }
       function saveGame() {
             const saveData = {
                 points: points,
@@ -692,22 +698,7 @@ function releaseWakeLock() {
                 currentPenaltySec += Math.floor((Date.now() - leaveTime) / 1000);
             }
 
-            const mult = getPointMultiplier();
-            const earnedPoints = Math.floor(elapsedSec * 1 * mult.value); // 倍率適用
-            const penaltyPoints = currentPenaltySec * 5; // 離脱1秒 = -5 PT
-
-            const estimatedFinalPoints = Math.max(0, earnedPoints - penaltyPoints);
-            // ① ポイント獲得分（600PTにつき1枚）
-            const ptTickets = Math.floor(estimatedFinalPoints / 600);
-
-            // ② 30分（1800秒）ごとの時間ボーナス分
-            const blocks = Math.floor(elapsedSec / 1800);
-            const timeTickets = (blocks * (blocks + 1) / 2) * 5;
-
-            // ① と ② を合算
-            const estimatedTickets = ptTickets + timeTickets;
-
-            // 倍率計算の適用
+        // 倍率計算の適用
             const mult = getPointMultiplier();
             const earnedPoints = Math.floor(elapsedSec * 1 * mult.value);
             const penaltyPoints = currentPenaltySec * 5;
@@ -719,12 +710,11 @@ function releaseWakeLock() {
             const estimatedTickets = ptTickets + timeTickets;
 
             if (currentPenaltySec > 0) {
-                btnStatusDiv.innerText = `集中中... 予定: +${earnedPoints} PT (⚠️離脱ペナルティ: -${penaltyPoints} PT / ${currentPenaltySec}秒) ➔ 見込み: +${estimatedFinalPoints} PT / チケット +${estimatedTickets} 枚`;
+                btnStatusDiv.innerText = `集中中... 予定: +${earnedPoints} PT [${mult.text}] (⚠️離脱ペナルティ: -${penaltyPoints} PT / ${currentPenaltySec}秒) ➔ 見込み: +${estimatedFinalPoints} PT / チケット +${estimatedTickets} 枚`;
             } else {
-                btnStatusDiv.innerText = `集中中... 獲得予定: +${earnedPoints} PT / チケット +${estimatedTickets} 枚`;
+                btnStatusDiv.innerText = `集中中... 獲得予定: +${earnedPoints} PT [${mult.text}] / チケット +${estimatedTickets} 枚`;
             }
-        }
-
+            
         function stopSession() {
             if (!isSessionActive) return;
             
@@ -734,11 +724,11 @@ function releaseWakeLock() {
                 leaveTime = null;
             }
 
-            const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
+           const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
 
-            // 1秒 = +1 PT / 離脱1秒 = -5 PT
+            // 倍率計算の適用
             const mult = getPointMultiplier();
-            const rawEarnedPoints = Math.floor(elapsedSec * 1 * mult.value); // 倍率適用
+            const rawEarnedPoints = Math.floor(elapsedSec * 1 * mult.value);
             const penaltyPoints = totalPenaltySeconds * 5;
             
             // 収支計算（マイナスの場合は既存ポイントからの没収額になる）
@@ -1116,7 +1106,7 @@ function getRandomSymbol() {
             navigator.serviceWorker.register('sw.js');
         }
 
-       // ターゲット時間帯セレクトボックスの初期化関数
+      // ターゲット時間帯セレクトボックスの初期化関数
         function initBonusTimeSelects() {
             const startSelect = document.getElementById('bonusStartHour');
             const endSelect = document.getElementById('bonusEndHour');
@@ -1170,28 +1160,26 @@ function getRandomSymbol() {
             }
         }
 
-// 画面離脱・復帰の時刻を記録して離脱秒数を集計 & スリープ防止の再取得
-document.addEventListener('visibilitychange', async () => {
-    if (!isSessionActive) return;
+// 画面復帰時の「スリープ防止再要求」と離脱集計
+        document.addEventListener('visibilitychange', async () => {
+            if (!isSessionActive) return;
 
-    if (document.hidden) {
-        // アプリから離れた時刻を記憶
-        leaveTime = Date.now();
-    } else {
-        // アプリに戻った時に離脱秒数を加算
-        if (leaveTime) {
-            const awaySec = Math.floor((Date.now() - leaveTime) / 1000);
-            totalPenaltySeconds += awaySec;
-            leaveTime = null;
-            console.log(`離脱検知: ${awaySec}秒間離脱 (累計: ${totalPenaltySeconds}秒)`);
-        }
-        
-        // ★重要: タブやアプリに戻った際、計測中であればスリープ防止を再要求する
-        if (wakeLock === null) {
-            await requestWakeLock();
-        }
-    }
-});
+            if (document.hidden) {
+                leaveTime = Date.now();
+            } else {
+                if (leaveTime) {
+                    const awaySec = Math.floor((Date.now() - leaveTime) / 1000);
+                    totalPenaltySeconds += awaySec;
+                    leaveTime = null;
+                    console.log(`離脱検知: ${awaySec}秒間離脱 (累計: ${totalPenaltySeconds}秒)`);
+                }
+
+                // スリープ防止機能の再要求
+                if (wakeLock === null) {
+                    await requestWakeLock();
+                }
+            }
+        });
        
     </script>
 </body>
