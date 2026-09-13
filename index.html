@@ -160,7 +160,20 @@
             </div>
         </div>
     </div>
-
+<!-- ⚙️ ボーナス時間帯設定 -->
+    <div class="card" style="border: 1px solid #17a2b8;">
+        <h3 style="margin: 0 0 10px 0; color: #17a2b8;">⚙️ 集中強化タイム設定</h3>
+        <div style="font-size: 13px; color: #555; margin-bottom: 8px;">
+            スマホを触りがちな時間帯を設定すると、その時間の集中ポイントが<b>2.0倍</b>になります！
+        </div>
+        <div style="display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 14px;">
+            <label>指定時間: </label>
+            <select id="bonusStartHour" style="padding: 4px; border-radius: 4px;"></select> 時
+            <span>〜</span>
+            <select id="bonusEndHour" style="padding: 4px; border-radius: 4px;"></select> 時
+        </div>
+        <div id="bonusStatusMsg" style="font-size: 12px; margin-top: 8px; color: #e67e22; font-weight: bold;"></div>
+    </div>
     <!-- ★ 一番下に移動：モード選択・ランキングエリア -->
     <div class="card">
         <h3 style="margin: 0 0 10px 0;">🏆 シーズン＆ランキング</h3>
@@ -507,11 +520,14 @@ function releaseWakeLock() {
                 currentMission: currentMission,
                 upgrades: upgrades,
                 weights: weights,
+                bonusStartHour: bonusStartHour,
+                bonusEndHour: bonusEndHour,
                 selectedMode: selectedMode,
                 seasonEndTime: seasonEndTime,
                 totalEarnedCoins: totalEarnedCoins,
                 consecutiveMissions: consecutiveMissions,
                 rankings: rankings
+                
             };
             localStorage.setItem('m5FocusSlotSave', JSON.stringify(saveData));
         }
@@ -528,7 +544,8 @@ function releaseWakeLock() {
                 if (saveData.currentMission) currentMission = saveData.currentMission;
                 if (saveData.upgrades) upgrades = Object.assign(upgrades, saveData.upgrades);
                 if (saveData.weights) weights = Object.assign(weights, saveData.weights);
-                
+                if (saveData.bonusStartHour !== undefined) bonusStartHour = saveData.bonusStartHour;
+                if (saveData.bonusEndHour !== undefined) bonusEndHour = saveData.bonusEndHour;
                 if (saveData.selectedMode) selectedMode = saveData.selectedMode;
                 if (saveData.seasonEndTime) seasonEndTime = saveData.seasonEndTime;
                 totalEarnedCoins = saveData.totalEarnedCoins || 0;
@@ -623,7 +640,8 @@ function releaseWakeLock() {
                 currentPenaltySec += Math.floor((Date.now() - leaveTime) / 1000);
             }
 
-            const earnedPoints = elapsedSec * 1; // 1秒 = +1 PT
+            const mult = getPointMultiplier();
+            const earnedPoints = Math.floor(elapsedSec * 1 * mult.value); // 倍率適用
             const penaltyPoints = currentPenaltySec * 5; // 離脱1秒 = -5 PT
 
             const estimatedFinalPoints = Math.max(0, earnedPoints - penaltyPoints);
@@ -656,7 +674,8 @@ function releaseWakeLock() {
             const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
 
             // 1秒 = +1 PT / 離脱1秒 = -5 PT
-            const rawEarnedPoints = elapsedSec * 1;
+            const mult = getPointMultiplier();
+            const rawEarnedPoints = Math.floor(elapsedSec * 1 * mult.value); // 倍率適用
             const penaltyPoints = totalPenaltySeconds * 5;
             
             // 収支計算（マイナスの場合は既存ポイントからの没収額になる）
@@ -1030,11 +1049,20 @@ function getRandomSymbol() {
         // ページ読み込み時の処理
         window.addEventListener('load', () => {
             loadGame();
+            initBonusTimeSelects(); // ★追加co
             if (!currentMission || !currentMission.text) {
                 currentMission = generateMission(stage);
             }
             updateUI();
         });
+
+       // ターゲット時間帯ステータス表示更新
+            const bonusMsgDiv = document.getElementById('bonusStatusMsg');
+            if (bonusMsgDiv) {
+                const mult = getPointMultiplier();
+                bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
+            }
+        }
 
 // 画面離脱・復帰の時刻を記録して離脱秒数を集計 & スリープ防止の再取得
 document.addEventListener('visibilitychange', async () => {
