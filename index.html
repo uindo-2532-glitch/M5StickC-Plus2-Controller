@@ -175,20 +175,7 @@
             </div>
         </div>
     </div>
-<!-- ⚙️ ボーナス時間帯設定 -->
-    <div class="card" style="border: 1px solid #17a2b8;">
-        <h3 style="margin: 0 0 10px 0; color: #17a2b8;">⚙️ 集中強化タイム設定</h3>
-        <div style="font-size: 13px; color: #555; margin-bottom: 8px;">
-            スマホを触りがちな時間帯を設定すると、その時間の集中ポイントが<b>2.0倍</b>になります！
-        </div>
-        <div style="display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 14px;">
-            <label>指定時間: </label>
-            <select id="bonusStartHour" style="padding: 4px; border-radius: 4px;"></select> 時
-            <span>〜</span>
-            <select id="bonusEndHour" style="padding: 4px; border-radius: 4px;"></select> 時
-        </div>
-        <div id="bonusStatusMsg" style="font-size: 12px; margin-top: 8px; color: #e67e22; font-weight: bold;"></div>
-    </div>
+    
     <!-- ★ 一番下に移動：モード選択・ランキングエリア -->
     <div class="card">
         <h3 style="margin: 0 0 10px 0;">🏆 シーズン＆ランキング</h3>
@@ -559,16 +546,17 @@ function releaseWakeLock() {
                     rankingHtml += `<div><b>${index + 1}位</b> (${item.date}): ${item.points} PT / ${item.coins} C / 連続${item.missions}回</div>`;
                 });
             }
-            document.getElementById('rankingDisplay').innerHTML = rankingHtml;
+          document.getElementById('rankingDisplay').innerHTML = rankingHtml;
 
+            // ボーナス時間帯の表示更新を updateUI の中に含める
             const bonusMsgDiv = document.getElementById('bonusStatusMsg');
             if (bonusMsgDiv) {
                 const mult = getPointMultiplier();
                 bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
             }
-        }
-       
-      function saveGame() {
+        } // ← updateUI の閉じカッコはここにする！
+
+        function saveGame() {
             const saveData = {
                 points: points,
                 tickets: tickets,
@@ -1101,11 +1089,11 @@ function getRandomSymbol() {
             updateUI();
         }, 1000);
 
-        if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
         }
 
-     // ターゲット時間帯セレクトボックスの初期化関数
+        // ターゲット時間帯セレクトボックスの初期化関数
         function initBonusTimeSelects() {
             const startSelect = document.getElementById('bonusStartHour');
             const endSelect = document.getElementById('bonusEndHour');
