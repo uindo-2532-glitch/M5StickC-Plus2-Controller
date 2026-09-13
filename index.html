@@ -287,6 +287,9 @@ function playSE(type) {
             weekly: []
         };
 
+       let bluetoothDevice = null;
+        let dataCharacteristic = null;
+       
         const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
         const CHARACTERISTIC_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
 
@@ -548,13 +551,12 @@ function releaseWakeLock() {
             }
           document.getElementById('rankingDisplay').innerHTML = rankingHtml;
 
-            // ボーナス時間帯の表示更新を updateUI の中に含める
             const bonusMsgDiv = document.getElementById('bonusStatusMsg');
             if (bonusMsgDiv) {
                 const mult = getPointMultiplier();
                 bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
             }
-        } // ← updateUI の閉じカッコはここにする！
+        } // ← updateUI はここで閉じる
 
         function saveGame() {
             const saveData = {
