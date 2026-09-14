@@ -668,7 +668,9 @@ function releaseWakeLock() {
                 currentPenaltySec += Math.floor((Date.now() - leaveTime) / 1000);
             }
 
-            const earnedPoints = elapsedSec * 1; // 1秒 = +1 PT
+            // ★倍率を取得
+            const mult = getPointMultiplier();
+            const earnedPoints = Math.floor(elapsedSec * 1 * mult.value); // 1秒 = +1 PT × 倍率
             const penaltyPoints = currentPenaltySec * 5; // 離脱1秒 = -5 PT
 
             const estimatedFinalPoints = Math.max(0, earnedPoints - penaltyPoints);
@@ -683,11 +685,10 @@ function releaseWakeLock() {
             const estimatedTickets = ptTickets + timeTickets;
 
             if (currentPenaltySec > 0) {
-                btnStatusDiv.innerText = `集中中... 予定: +${earnedPoints} PT (⚠️離脱ペナルティ: -${penaltyPoints} PT / ${currentPenaltySec}秒) ➔ 見込み: +${estimatedFinalPoints} PT / チケット +${estimatedTickets} 枚`;
+                btnStatusDiv.innerText = `集中中... 予定: +${earnedPoints} PT [${mult.text}] (⚠️離脱ペナルティ: -${penaltyPoints} PT / ${currentPenaltySec}秒) ➔ 見込み: +${estimatedFinalPoints} PT / チケット +${estimatedTickets} 枚`;
             } else {
-                btnStatusDiv.innerText = `集中中... 獲得予定: +${earnedPoints} PT / チケット +${estimatedTickets} 枚`;
+                btnStatusDiv.innerText = `集中中... 獲得予定: +${earnedPoints} PT [${mult.text}] / チケット +${estimatedTickets} 枚`;
             }
-        }
 
         function stopSession() {
             if (!isSessionActive) return;
@@ -700,8 +701,9 @@ function releaseWakeLock() {
 
             const elapsedSec = Math.floor((Date.now() - sessionStartTime) / 1000);
 
-            // 1秒 = +1 PT / 離脱1秒 = -5 PT
-            const rawEarnedPoints = elapsedSec * 1;
+            // ★倍率を取得して計算
+            const mult = getPointMultiplier();
+            const rawEarnedPoints = Math.floor(elapsedSec * 1 * mult.value);
             const penaltyPoints = totalPenaltySeconds * 5;
             
             // 収支計算（マイナスの場合は既存ポイントからの没収額になる）
