@@ -528,6 +528,13 @@ function releaseWakeLock() {
                 });
             }
             document.getElementById('rankingDisplay').innerHTML = rankingHtml;
+
+            // ★ここを追加：倍率メッセージの更新
+            const bonusMsgDiv = document.getElementById('bonusStatusMsg');
+            if (bonusMsgDiv) {
+                const mult = getPointMultiplier();
+                bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
+            }
         }
       function saveGame() {
             const saveData = {
@@ -543,7 +550,9 @@ function releaseWakeLock() {
                 seasonEndTime: seasonEndTime,
                 totalEarnedCoins: totalEarnedCoins,
                 consecutiveMissions: consecutiveMissions,
-                rankings: rankings
+                rankings: rankings,
+                bonusStartHour: bonusStartHour, // ★追加
+                bonusEndHour: bonusEndHour     // ★追加
             };
             localStorage.setItem('m5FocusSlotSave', JSON.stringify(saveData));
         }
@@ -566,6 +575,10 @@ function releaseWakeLock() {
                 totalEarnedCoins = saveData.totalEarnedCoins || 0;
                 consecutiveMissions = saveData.consecutiveMissions || 0;
                 if (saveData.rankings) rankings = saveData.rankings;
+
+                if (saveData.bonusStartHour !== undefined) bonusStartHour = saveData.bonusStartHour; // ★追加
+                if (saveData.bonusEndHour !== undefined) bonusEndHour = saveData.bonusEndHour;         // ★追加
+
                 updateUI();
             }
         }
