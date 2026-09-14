@@ -1055,13 +1055,51 @@ function getRandomSymbol() {
             updateUI();
         }, 1000);
 
-        if ('serviceWorker' in navigator) {
+       if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
+        }
+
+        // ターゲット時間帯セレクトボックスの初期化関数
+        function initBonusTimeSelects() {
+            const startSelect = document.getElementById('bonusStartHour');
+            const endSelect = document.getElementById('bonusEndHour');
+
+            if (!startSelect || !endSelect) return;
+
+            startSelect.innerHTML = '';
+            endSelect.innerHTML = '';
+
+            for (let i = 0; i < 24; i++) {
+                const optStart = document.createElement('option');
+                optStart.value = i;
+                optStart.textContent = `${String(i).padStart(2, '0')}:00`;
+                if (i === bonusStartHour) optStart.selected = true;
+                startSelect.appendChild(optStart);
+
+                const optEnd = document.createElement('option');
+                optEnd.value = i;
+                optEnd.textContent = `${String(i).padStart(2, '0')}:00`;
+                if (i === bonusEndHour) optEnd.selected = true;
+                endSelect.appendChild(optEnd);
+            }
+
+            startSelect.addEventListener('change', (e) => {
+                bonusStartHour = parseInt(e.target.value);
+                saveGame();
+                updateUI();
+            });
+
+            endSelect.addEventListener('change', (e) => {
+                bonusEndHour = parseInt(e.target.value);
+                saveGame();
+                updateUI();
+            });
         }
 
         // ページ読み込み時の処理
         window.addEventListener('load', () => {
             loadGame();
+            initBonusTimeSelects(); // ←ここを追加
             if (!currentMission || !currentMission.text) {
                 currentMission = generateMission(stage);
             }
