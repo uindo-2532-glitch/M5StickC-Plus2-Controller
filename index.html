@@ -203,6 +203,23 @@
     </div>
     
    <script>
+        // --- 集中強化タイム（ボーナス時間帯）設定変数 ---
+        let bonusStartHour = 19; // デフォルト19時
+        let bonusEndHour = 23;   // デフォルト23時
+
+        // 現在時刻がボーナス時間帯内かチェックして倍率を返す関数
+        function getPointMultiplier() {
+            const currentHour = new Date().getHours();
+            let isBonus = false;
+            if (bonusStartHour <= bonusEndHour) {
+                isBonus = currentHour >= bonusStartHour && currentHour < bonusEndHour;
+            } else {
+                // 日をまたぐ設定（例: 22時〜6時）の場合
+                isBonus = currentHour >= bonusStartHour || currentHour < bonusEndHour;
+            }
+            return isBonus ? { value: 2.0, text: '🔥 強化タイム 2.0倍' } : { value: 1.0, text: '通常 1.0倍' };
+        }
+
        // Web Audio APIの初期化
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
