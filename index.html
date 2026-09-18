@@ -599,8 +599,7 @@ function releaseWakeLock() {
                 dataCharacteristic.addEventListener('characteristicvaluechanged', handleNotifications);
 
                 statusDiv.innerText = "接続完了！";
-                ledOnBtn.disabled = false;
-                ledOffBtn.disabled = false;
+                
             } catch (error) {
                 console.error(error);
                 statusDiv.innerText = "エラー: " + error;
@@ -609,23 +608,15 @@ function releaseWakeLock() {
 
         function onDisconnected() {
             statusDiv.innerText = "切断されました！";
-            ledOnBtn.disabled = true;
-            ledOffBtn.disabled = true;
-
+            
             if (isSessionActive) {
                 applyPenalty("切断ペナルティ");
                 stopSession();
             }
         }
 
-        async function sendData(value) {
-            if (!dataCharacteristic) return;
-            const encoder = new TextEncoder();
-            await dataCharacteristic.writeValue(encoder.encode(value));
-        }
 
-        ledOnBtn.addEventListener('click', () => sendData('1'));
-        ledOffBtn.addEventListener('click', () => sendData('0'));
+        
 
         function handleNotifications(event) {
             const value = event.target.value.getUint8(0);
