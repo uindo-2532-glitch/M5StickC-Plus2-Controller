@@ -547,19 +547,15 @@ function releaseWakeLock() {
             }
             document.getElementById('rankingDisplay').innerHTML = rankingHtml;
 
-            // ★ここを追加：倍率メッセージの更新
+            // ★倍率メッセージの更新（1回だけ記述する）
             const bonusMsgDiv = document.getElementById('bonusStatusMsg');
             if (bonusMsgDiv) {
                 const mult = getPointMultiplier();
                 bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
             }
-            const bonusMsgDiv = document.getElementById('bonusStatusMsg');
-    if (bonusMsgDiv) {
-        const mult = getPointMultiplier();
-        bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
-    }
         }
-      function saveGame() {
+
+        function saveGame() {
             const saveData = {
                 points: points,
                 tickets: tickets,
