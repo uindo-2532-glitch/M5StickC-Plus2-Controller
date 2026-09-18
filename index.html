@@ -205,7 +205,14 @@
 
         // 現在時刻がボーナス時間帯内かチェックして倍率を返す関数
         function getPointMultiplier() {
-            const currentHour = new Date().getHours();
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentDay = now.getDay(); // 0: 日曜, 6: 土曜
+
+            let multiplier = 1.0;
+            let reasons = [];
+
+            // 1. ターゲット時間帯チェック
             let isBonus = false;
             if (bonusStartHour <= bonusEndHour) {
                 isBonus = currentHour >= bonusStartHour && currentHour < bonusEndHour;
@@ -213,9 +220,24 @@
                 // 日をまたぐ設定（例: 22時〜6時）の場合
                 isBonus = currentHour >= bonusStartHour || currentHour < bonusEndHour;
             }
-            return isBonus ? { value: 2.0, text: '🔥 強化タイム 2.0倍' } : { value: 1.0, text: '通常 1.0倍' };
-        }
 
+            if (isBonus) {
+                multiplier *= 2.0;
+                reasons.push('🔥 強化タイム 2.0倍');
+            }
+
+            // 2. 週末ボーナス（土日）チェック
+            if (currentDay === 0 || currentDay === 6) {
+                multiplier *= 1.5;
+                reasons.push('🎉 週末ボーナス 1.5倍');
+            }
+
+            // 倍率の文字列を作成
+            const text = reasons.length > 0 ? reasons.join(' + ') : '通常 1.0倍';
+
+            return { value: multiplier, text: text };
+        }
+       
        // Web Audio APIの初期化
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -531,6 +553,11 @@ function releaseWakeLock() {
                 const mult = getPointMultiplier();
                 bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
             }
+            const bonusMsgDiv = document.getElementById('bonusStatusMsg');
+    if (bonusMsgDiv) {
+        const mult = getPointMultiplier();
+        bonusMsgDiv.innerHTML = `現在の倍率: <b>${mult.value}倍</b> (${mult.text})`;
+    }
         }
       function saveGame() {
             const saveData = {
