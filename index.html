@@ -91,7 +91,10 @@
     <h2>M5StickCPlus2 Focus Tracker</h2>
 
     <button class="btn-connect" id="connectBtn">M5Stackに接続</button>
-    
+    <br>
+    <button class="btn-on" id="ledOnBtn" disabled>LED 点灯</button>
+    <button class="btn-off" id="ledOffBtn" disabled>LED 消灯</button>
+
     <div id="status">ステータス: 未接続</div>
 
     <!-- メイン実績＆タイマー -->
@@ -460,6 +463,8 @@ function releaseWakeLock() {
 
         // DOM要素
         const connectBtn   = document.getElementById('connectBtn');
+        const ledOnBtn     = document.getElementById('ledOnBtn');
+        const ledOffBtn    = document.getElementById('ledOffBtn');
         const statusDiv    = document.getElementById('status');
         const btnStatusDiv = document.getElementById('btnStatus');
         const pointDisplay = document.getElementById('pointDisplay');
